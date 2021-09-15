@@ -14,5 +14,5 @@ where `lambda_` and `M` are as in the paper. See `example.py` for a simple examp
 
 ## References:
 
-[Original paper](https://jmlr.org/papers/volume22/20-848/20-848.pdf)
-[Original repo](https://github.com/lasso-net/lassonet)
+* [Original paper](https://jmlr.org/papers/volume22/20-848/20-848.pdf)
+* [Original repo](https://github.com/lasso-net/lassonet)
