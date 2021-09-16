@@ -103,7 +103,7 @@ optimizer = torch.optim.SGD(model.parameters(), lr = alpha0, momentum = 0.9, nes
 scheduler = StepLR(optimizer, step_size = 30, gamma = 0.5)
 
 
-all_loss = model.train(loss_f, dl, opt = optimizer, lr_schedule = scheduler, n_epochs = n_epochs, verbose = True)
+all_loss = model.do_training(loss_f, dl, opt = optimizer, lr_schedule = scheduler, n_epochs = n_epochs, verbose = True)
 
 #%% Evaluation
 

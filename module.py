@@ -80,7 +80,7 @@ class LassoNet(torch.nn.Module):
         y2 = self.skip(x)
         return y1+y2
     
-    def train(self, loss, dl, opt = None, lr_schedule = None, n_epochs = 10, verbose = True):
+    def do_training(self, loss, dl, opt = None, lr_schedule = None, n_epochs = 10, verbose = True):
         """
         dl: PyTorch DataLoader
         loss: loss function
