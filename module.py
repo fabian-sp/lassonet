@@ -79,3 +79,45 @@ class LassoNet(torch.nn.Module):
         y1 = self.G(x)
         y2 = self.skip(x)
         return y1+y2
+    
+    def train(self, loss, dl, opt = None, lr_schedule = None, n_epochs = 10, verbose = True):
+        """
+        dl: PyTorch DataLoader
+        loss: loss function
+        opt: PyTorch optimizer
+        lr_schedule: PyTorch learning rate scheduler
+        """
+        if opt is None:
+            opt = torch.optim.SGD(self.parameters(), lr = 0.001, momentum = 0.9, nesterov = True)
+        
+        all_loss = list()
+
+        for j in np.arange(n_epochs):
+            
+            for data, target in dl:
+                
+                # forward pass
+                y_pred = self.forward(data)
+                # compute loss
+                loss_val = loss(y_pred, target)           
+                # zero gradients
+                opt.zero_grad()    
+                # backward pass
+                loss_val.backward()    
+                # iteration
+                opt.step()
+                # step size
+                alpha = opt.state_dict()['param_groups'][0]['lr']
+                # prox step
+                self.skip.weight.data, self.G.W1.weight.data = hier_prox(self.skip.weight.data, self.G.W1.weight.data,\
+                                                                            lambda_=self.lambda_*alpha, lambda_bar=0, M = self.M)
+                
+            if lr_schedule is not None:
+                lr_schedule.step()
+                
+            if verbose:
+                print(f"Epoch {j}, loss:", loss_val.item())
+                
+            all_loss.append(loss_val.item())
+            
+        return all_loss

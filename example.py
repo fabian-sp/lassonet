@@ -2,18 +2,21 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 from torch.optim.lr_scheduler import StepLR
+from torch.utils.data import Dataset, DataLoader
 
-from module import LassoNet, hier_prox
+from module import LassoNet
 
 torch.manual_seed(42)
 np.random.seed(42)
 
-#%%
+#%% Generate data
 
 D_in = 10 # input dimension
 D_out = 1 # output dimension
 H = 30 # hidden layer size
+
 N = 1000 # training samples
+batch_size = 15 
 
 def generate_toy_example(N):
     X = torch.randn(N, D_in)  
@@ -23,7 +26,25 @@ def generate_toy_example(N):
 
 X, Y = generate_toy_example(N)
 
-#%%
+#%% Create DataLoader (see https://pytorch.org/tutorials/beginner/basics/data_tutorial.html)
+
+class MyDataset(Dataset):
+    def __init__(self, X, Y):
+        self.X = X
+        self.Y = Y
+
+    def __len__(self):
+        return len(self.Y)
+
+    def __getitem__(self, idx):
+        x = self.X[idx, :]
+        y = self.Y[idx]
+        return x, y
+    
+ds = MyDataset(X,Y)
+dl = DataLoader(ds, batch_size = batch_size, shuffle = True)
+
+#%% Define non-linear part of LassoNet
 
 class myG(torch.nn.Module):
     """
@@ -62,8 +83,7 @@ M = 1.
 G = myG(D_in, D_out)
 model = LassoNet(G, lambda_ = l1, M = M)
 
-loss_fn = torch.nn.MSELoss(reduction='mean')
-
+loss_f = torch.nn.MSELoss(reduction='mean')
 
 # params of G are already included in params of model!
 for param in model.parameters():
@@ -71,53 +91,21 @@ for param in model.parameters():
 
 #%% Training
 
-b = 15 # batch size
-n_epoch = 300
+n_epochs = 300
 alpha0 = 1e-3 # initial step size/learning rate
 
 all_loss = list()
 
 
-optimizer = torch.optim.Adam(model.parameters(), lr=alpha0)
-#optimizer = torch.optim.SGD(model.parameters(), lr = alpha0, momentum = 0.9, nesterov = True)
+#optimizer = torch.optim.Adam(model.parameters(), lr = alpha0)
+optimizer = torch.optim.SGD(model.parameters(), lr = alpha0, momentum = 0.9, nesterov = True)
 
-scheduler = StepLR(optimizer, step_size=1, gamma=0.5)
+scheduler = StepLR(optimizer, step_size = 30, gamma = 0.5)
 
-for j in np.arange(n_epoch):
-    print(f"EPOCH {j}")
-    
-    for i in np.arange(N//b):    
-        # sample mini-batch
-        S = torch.randint(high = N, size = (b,))    
-        x_batch = X[S]; y_batch = Y[S]            
-        
-        # forward pass
-        y_pred = model.forward(x_batch)
-        # compute loss
-        loss = loss_fn(y_pred, y_batch)           
-        # zero gradients
-        optimizer.zero_grad()    
-        # backward pass
-        loss.backward()    
-        # iteration
-        optimizer.step()
-        # step size
-        alpha = optimizer.state_dict()['param_groups'][0]['lr']
-        # prox step
-        model.skip.weight.data, model.G.W1.weight.data = hier_prox(model.skip.weight.data, model.G.W1.weight.data,\
-                                                                    lambda_=model.lambda_*alpha, lambda_bar=0, M = model.M)
-        
-    # decrease step size
-    if j%50 ==0:
-        scheduler.step()
-    
-    print("loss:", loss.item())
-    all_loss.append(loss.item())
 
-#%% evaluation
+all_loss = model.train(loss_f, dl, opt = optimizer, lr_schedule = scheduler, n_epochs = n_epochs, verbose = True)
 
-for param in model.parameters():
-    print(param.data)
+#%% Evaluation
 
 print("theta: ", model.skip.weight.data)
 
