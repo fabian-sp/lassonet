@@ -68,12 +68,26 @@ class myG(torch.nn.Module):
         x = self.relu(x)
         x = self.W3(x)
         return x
-    
-    
-    # def forward(self, x):
-    #     y = self.W1(x)
-    #     z = torch.einsum('ij,ij->i',x,y).reshape(-1,1)
-    #     return z
+
+
+#%% Define HierNet
+
+class myG(torch.nn.Module):
+    """
+    2-layer NN with RelU
+    """
+    def __init__(self, D_in, D_out):
+        super().__init__()
+        self.D_in = D_in
+        self.D_out = D_out
+        
+        self.W1 = torch.nn.Linear(D_in, D_in, bias = False)
+        return
+        
+    def forward(self, x):
+        y = self.W1(x)
+        z = torch.einsum('ij,ij->i',x,y).reshape(-1,1)
+        return z
     
 #%% Initialize the model
 
@@ -114,3 +128,10 @@ plt.plot(all_loss)
 
 plt.figure()
 plt.imshow(G.W1.weight.data, cmap = "coolwarm")
+
+
+# test einsum
+#x1 = torch.randn(1,10)
+#y1 = G(x1)
+#x = x1.reshape(-1)
+#x.T @ G.W1.weight.data @ x
