@@ -59,7 +59,7 @@ def hier_prox(v, u, lambda_, lambda_bar, M):
 #%% own implementation of LassoNet
 
 class LassoNet(torch.nn.Module):
-    def __init__(self, G, lambda_ = 0.01, M = 10):
+    def __init__(self, G, lambda_ = 0.01, M = 10, theta_bias = False):
         """
         G is a torch object itself
         G needs to have a linear layer at the beginning called G.W1
@@ -72,7 +72,7 @@ class LassoNet(torch.nn.Module):
         self.D_in = self.G.D_in
         self.D_out = self.G.D_out
         
-        self.skip = torch.nn.Linear(self.D_in, self.D_out, bias = False) # skip connection aka theta
+        self.skip = torch.nn.Linear(self.D_in, self.D_out, bias = theta_bias) # skip connection aka theta
         return
     
     def forward(self, x):

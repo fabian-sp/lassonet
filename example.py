@@ -84,9 +84,15 @@ class myG(torch.nn.Module):
         self.W1 = torch.nn.Linear(D_in, D_in, bias = False)
         return
         
-    def forward(self, x):
-        y = self.W1(x)
+    def forward(self, x):       
+        # compute W^Tx
+        y1 = torch.matmul(self.W1.weight.t(), x.t()).t()
+        # compute Wx
+        y2 = self.W1(x)
+        y = (y2+y1)/2
+        # compute x^T(W+W^T)/2 x
         z = torch.einsum('ij,ij->i',x,y).reshape(-1,1)
+        
         return z
     
 #%% Initialize the model
@@ -95,13 +101,20 @@ l1 = 3.
 M = 1.
 
 G = myG(D_in, D_out)
-model = LassoNet(G, lambda_ = l1, M = M)
+model = LassoNet(G, lambda_ = l1, M = M, theta_bias = True)
 
 loss_f = torch.nn.MSELoss(reduction='mean')
 
 # params of G are already included in params of model!
 for param in model.parameters():
     print(param.size())
+
+
+# testing dimensionality of linear layers
+#x0 = torch.rand(batch_size, D_in)
+#y1=G.W1(x0)
+#y2 = torch.matmul(G.W1.weight, x0.t()).t()
+#(y1-y2).min()
 
 #%% Training
 
@@ -127,7 +140,7 @@ plt.figure()
 plt.plot(all_loss)
 
 plt.figure()
-plt.imshow(G.W1.weight.data, cmap = "coolwarm")
+plt.imshow(G.W1.weight.data, cmap = "coolwarm", vmin = -.1, vmax = .1)
 
 
 # test einsum
