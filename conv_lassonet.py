@@ -1,4 +1,5 @@
 """
+implemnetation of LassoNet where the hierarchical penalty is applied to the convolutional filters.  
 """
 
 import numpy as np
@@ -41,6 +42,9 @@ class ConvLassoNet(nn.Module):
         
         super(ConvLassoNet, self).__init__()
         
+        self.lambda_ = lambda_
+        self.M = M
+        
         self.D_in = D_in
         self.D_out = D_out
         self.out_channels = out_channels # number of output channels of first convolutional layer
@@ -60,9 +64,15 @@ class ConvLassoNet(nn.Module):
         self.fc1 = nn.Linear(7*7*64, 1000)
         self.fc2 = nn.Linear(1000, self.D_out)
         
+        return
+        
     def forward(self, x):
         out = self.conv1(x)
-        z1 = self.skip(out.view(-1, self.out_channels*self.D_in))
+        self.m1 = out.size(2)
+        self.m2 = out.size(3)
+        z1 = self.skip(out.reshape(-1, self.out_channels*self.m1*self.m2))
+        
+        # rest of non-linear part: can be adapted freely
         out = self.relu(out)
         out = self.maxpool(out)
         out = self.layer2(out)
@@ -71,6 +81,21 @@ class ConvLassoNet(nn.Module):
         out = self.fc1(out)
         z2 = self.fc2(out)
         return z1+z2
+    
+    def prox(self, lr):
+        # loop through output channels / filters
+        for j in range(self.out_channels):
+            theta_j = self.skip.weight.data[:,self.m1*self.m2*j:self.m1*self.m2*(j+1)].reshape(-1)
+            filter_j = self.conv1.weight[j,0,:,:].reshape(-1)
+            theta_j, filter_j = hier_prox(theta_j, filter_j, lambda_=self.lambda_*lr, lambda_bar=0, M = self.M)
+            
+            
+            self.skip.weight.data[:,self.m1*self.m2*j:self.m1*self.m2*(j+1)] = theta_j.reshape(self.D_out, -1)
+            self.conv1.weight.data[j,0,:,:] = filter_j.reshape(5,5) #replace with self.kernel_size
+            
+            
+        return
+        
 
     
 #%% the actual model
@@ -81,7 +106,6 @@ M = 1.
 model = ConvLassoNet(lambda_ = l1, M = M, D_in = 784, D_out = 10, out_channels = 32)
 
 loss_fn = torch.nn.CrossEntropyLoss()
-
 # test forward method, reshape input to vector with view
 model.forward(images).size()
 
@@ -92,11 +116,11 @@ for param in model.parameters():
     
 #%% TRAINING
 
-n_epoch = 20
+n_epoch = 1
 alpha0 = 1e-3
 
 all_loss = list()
-
+''
 #optimizer = torch.optim.Adam(model.parameters(), lr=alpha0)
 optimizer = torch.optim.SGD(model.parameters(), lr = alpha0, momentum = 0.9, nesterov = True)
 
@@ -104,12 +128,12 @@ scheduler = StepLR(optimizer, step_size=1, gamma=0.5)
 
 for j in np.arange(n_epoch):
     print(f"EPOCH {j}")
-    for data, target in train_loader:
+    for images, labels in train_loader:
             
         # forward pass
-        y_pred = model.forward(data.view(-1,28*28))    
+        y_pred = model.forward(images)    
         # compute loss.
-        loss = loss_fn(y_pred, target)           
+        loss = loss_fn(y_pred, labels)           
         # zero gradients
         optimizer.zero_grad()    
         # backward pass
@@ -119,8 +143,7 @@ for j in np.arange(n_epoch):
         # step size
         alpha = optimizer.state_dict()['param_groups'][0]['lr']
         # prox step
-        model.skip.weight.data, model.G.W1.weight.data = hier_prox(model.skip.weight.data, model.G.W1.weight.data,\
-                                                                   lambda_=model.lambda_*alpha, lambda_bar=0, M = model.M)
+        model.prox(alpha)
         
     # decrease step size
     if j%10 ==0:
@@ -128,7 +151,9 @@ for j in np.arange(n_epoch):
     
     print("loss:", loss.item())
     all_loss.append(loss.item())
-    
+
+#%%    
+
 for param in model.parameters():
     print(param.data)
 
@@ -137,12 +162,28 @@ print("theta: ", model.skip.weight.data)
 plt.figure()
 plt.plot(all_loss)
 
-plt.figure()
-plt.imshow(G.W1.weight.data, cmap = "coolwarm")
+#%%
+# Plot Conv filter weights
+conv_filter = model.conv1.weight.data
+fig, axs = plt.subplots(4,8)
+
+for j in np.arange(conv_filter.size(0)):
+    ax = axs.ravel()[j]
+    ax.imshow(conv_filter[j,0,:,:], cmap = plt.cm.cividis, vmin = -0.5, vmax = 0.5)
+    ax.axis('off')
+
+plt.show()
 
 
-importance = model.skip.weight.data.mean(dim=0).view(28,28).numpy()
-importance = model.skip.weight.data[3,:].view(28,28).numpy()
-plt.figure()
-plt.imshow(importance, cmap = "coolwarm")#, vmin = -0.0001, vmax = 0.0001)
+#%% reshaping
+#batch,out_channels,m1,m2
+H=torch.randn(3, 5, 4, 4)
+
+h=H.reshape(3, -1)
+
+j = 2
+
+H[0,j,:,:]
+
+h[0, 16*j:16*(j+1)].reshape(4,4)
 

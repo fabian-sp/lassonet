@@ -3,7 +3,7 @@ import torch
 from torch.nn import functional as F
 
  
-# The following code is copied from https://github.com/lasso-net/lassonet/blob/master/lassonet/prox.py
+# The following code is copied (with small adaptations) from https://github.com/lasso-net/lassonet/blob/master/lassonet/prox.py
 # Copyright of Louis Abraham, Ismael Lemhadri
 
 
@@ -16,10 +16,10 @@ def sign_binary(x):
 
 def hier_prox(v, u, lambda_, lambda_bar, M):
     """
-    v has shape (m,) or (m, batches), batches = d
-    u has shape (k,) or (k, batches) , k = K
+    v has shape (k,) or (k, d)
+    u has shape (K,) or (K, d)
     
-    easy case: v has size (1,d), u has size (K,d)
+    standard case described in the paper: v has size (1,d), u has size (K,d)
     
     """
     onedim = len(v.shape) == 1
@@ -28,9 +28,9 @@ def hier_prox(v, u, lambda_, lambda_bar, M):
         u = u.unsqueeze(-1)
 
     u_abs_sorted = torch.sort(u.abs(), dim=0, descending=True).values
-    k, batch = u.shape
+    k, d = u.shape
     s = torch.arange(k + 1.0).view(-1, 1).to(v)
-    zeros = torch.zeros(1, batch).to(u)
+    zeros = torch.zeros(1, d).to(u)
 
     a_s = lambda_ - M * torch.cat(
         [zeros, torch.cumsum(u_abs_sorted - lambda_bar, dim=0)]
@@ -44,9 +44,9 @@ def hier_prox(v, u, lambda_, lambda_bar, M):
 
     idx = torch.sum(lower > w, dim=0).unsqueeze(0)
 
-    x_star = torch.gather(x, 0, idx).view(1, batch)
-    w_star = torch.gather(w, 0, idx).view(1, batch)
-
+    x_star = torch.gather(x, 0, idx).view(1, d)
+    w_star = torch.gather(w, 0, idx).view(1, d)
+    
     beta_star = x_star * v
     theta_star = sign_binary(u) * torch.min(soft_threshold(lambda_bar, u.abs()), w_star)
 
