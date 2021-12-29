@@ -1,5 +1,5 @@
 """
-see the tutorial: https://github.com/ozx1812/MNIST-PyTorch/blob/master/mnist_mlp_pytorch.py
+adapted from this tutorial: https://github.com/ozx1812/MNIST-PyTorch/blob/master/mnist_mlp_pytorch.py
 """
 
 import numpy as np
@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import torch
 from torch.optim.lr_scheduler import StepLR
 
-from module import LassoNet, hier_prox
+from module import LassoNet
 
 from torchvision import datasets
 import torchvision.transforms as transforms
@@ -52,7 +52,6 @@ class myG(torch.nn.Module):
         return
     
     def forward(self, x):
-        # add hidden layer, with relu activation function
         x = self.W1(x)
         x = self.relu(x)
         x = self.W2(x)
@@ -74,55 +73,30 @@ loss_fn = torch.nn.CrossEntropyLoss()
 G(images.view(-1,28*28))
 model.forward(images.view(-1,28*28))
 
-
 # params of G are already included in params of model!
 for param in model.parameters():
     print(param.size())
     
-#%% TRAINING
+#%% training
 
-n_epoch = 20
 alpha0 = 1e-3
-
-all_loss = list()
 
 #optimizer = torch.optim.Adam(model.parameters(), lr=alpha0)
 optimizer = torch.optim.SGD(model.parameters(), lr = alpha0, momentum = 0.9, nesterov = True)
 
 scheduler = StepLR(optimizer, step_size=1, gamma=0.5)
 
-for j in np.arange(n_epoch):
-    print(f"EPOCH {j}")
-    for data, target in train_loader:
-            
-        # forward pass
-        y_pred = model.forward(data.view(-1,28*28))    
-        # compute loss.
-        loss = loss_fn(y_pred, target)           
-        # zero gradients
-        optimizer.zero_grad()    
-        # backward pass
-        loss.backward()    
-        # iteration
-        optimizer.step()
-        # step size
-        alpha = optimizer.state_dict()['param_groups'][0]['lr']
-        # prox step
-        model.skip.weight.data, model.G.W1.weight.data = hier_prox(model.skip.weight.data, model.G.W1.weight.data,\
-                                                                   lambda_=model.lambda_*alpha, lambda_bar=0, M = model.M)
-        
-    # decrease step size
-    if j%10 ==0:
-        scheduler.step()
-    
-    print("loss:", loss.item())
-    all_loss.append(loss.item())
-    
+prep = lambda x: x.reshape(-1,28*28)
+
+all_loss = model.do_training(loss_fn, train_loader, opt = optimizer, lr_schedule = scheduler, n_epochs = 20,\
+                             preprocess = prep, verbose = True)
+
 for param in model.parameters():
     print(param.data)
 
 print("theta: ", model.skip.weight.data)
 
+#%%
 plt.figure()
 plt.plot(all_loss)
 
@@ -130,8 +104,8 @@ plt.figure()
 plt.imshow(G.W1.weight.data, cmap = "coolwarm")
 
 
-importance = model.skip.weight.data.mean(dim=0).view(28,28).numpy()
-importance = model.skip.weight.data[3,:].view(28,28).numpy()
+#importance = model.skip.weight.data.mean(dim=0).view(28,28).numpy()
+importance = model.skip.weight.data[7,:].view(28,28).numpy()
 plt.figure()
 plt.imshow(importance, cmap = "coolwarm")#, vmin = -0.0001, vmax = 0.0001)
 

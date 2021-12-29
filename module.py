@@ -80,12 +80,13 @@ class LassoNet(torch.nn.Module):
         y2 = self.skip(x)
         return y1+y2
     
-    def do_training(self, loss, dl, opt = None, lr_schedule = None, n_epochs = 10, verbose = True):
+    def do_training(self, loss, dl, opt = None, lr_schedule = None, n_epochs = 10, preprocess = None, verbose = True):
         """
-        dl: PyTorch DataLoader
-        loss: loss function
-        opt: PyTorch optimizer
-        lr_schedule: PyTorch learning rate scheduler
+        dl:             PyTorch DataLoader
+        loss:           PyTorch loss function
+        opt:            PyTorch optimizer
+        lr_schedule:    PyTorch learning rate scheduler
+        preprocess:     function before inputting, e.g. reshping image into vector
         """
         if opt is None:
             opt = torch.optim.SGD(self.parameters(), lr = 0.001, momentum = 0.9, nesterov = True)
@@ -94,12 +95,15 @@ class LassoNet(torch.nn.Module):
 
         for j in np.arange(n_epochs):
             
-            for data, target in dl:
+            for inputs, targets in dl:
+                
+                if preprocess is not None:
+                    inputs = preprocess(inputs)
                 
                 # forward pass
-                y_pred = self.forward(data)
+                y_pred = self.forward(inputs)
                 # compute loss
-                loss_val = loss(y_pred, target)           
+                loss_val = loss(y_pred, targets)           
                 # zero gradients
                 opt.zero_grad()    
                 # backward pass
