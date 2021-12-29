@@ -2,7 +2,7 @@
 
 ## How to use
 
-The LassoNet has been implemented by their authors, however only for feed-forward neural networks with RelU activation. Here, we try to implement the idea more generally.
+The LassoNet has been implemented by their authors, however only for feed-forward neural networks with ReLU activation. Here, we try to implement the idea more generally.
 
 You can create a `LassoNet` specifying for `G` any Pytorch module/architecture you want. The only constraint is that the first module of `G` is a linear layer, called `W1`.
 Hence, make sure that `G.W1` exists and is of type `torch.nn.Linear`. The `LassoNet` is then initialized via
