@@ -36,7 +36,7 @@ images, labels = dataiter.next()
 
 #%%
 
-class myG(torch.nn.Module):
+class FeedForward(torch.nn.Module):
     """
     2-layer NN with RelU
     """
@@ -64,10 +64,10 @@ class myG(torch.nn.Module):
 l1 = 5.
 M = 1.
 
-G = myG()
+G = FeedForward()
 model = LassoNet(G, lambda_ = l1, M = M)
 
-loss_fn = torch.nn.CrossEntropyLoss()
+loss = torch.nn.CrossEntropyLoss()
 
 # test forward method, reshape input to vector with view
 G(images.view(-1,28*28))
@@ -81,14 +81,14 @@ for param in model.parameters():
 
 alpha0 = 1e-3
 
-#optimizer = torch.optim.Adam(model.parameters(), lr=alpha0)
-optimizer = torch.optim.SGD(model.parameters(), lr = alpha0, momentum = 0.9, nesterov = True)
+#opt = torch.optim.Adam(model.parameters(), lr=alpha0)
+opt = torch.optim.SGD(model.parameters(), lr = alpha0, momentum = 0.9, nesterov = True)
 
-scheduler = StepLR(optimizer, step_size=1, gamma=0.5)
+sched = StepLR(opt, step_size=1, gamma=0.5)
 
 prep = lambda x: x.reshape(-1,28*28)
 
-all_loss = model.do_training(loss_fn, train_loader, opt = optimizer, lr_schedule = scheduler, n_epochs = 20,\
+all_loss = model.do_training(loss, train_loader, opt = opt, lr_schedule = sched, n_epochs = 20,\
                              preprocess = prep, verbose = True)
 
 for param in model.parameters():

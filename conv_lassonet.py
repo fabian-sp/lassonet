@@ -5,42 +5,34 @@ some snippets from: https://medium.com/dataseries/visualizing-the-feature-maps-a
 """
 
 import numpy as np
-import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
-from torch.optim.lr_scheduler import StepLR
 
 from module import hier_prox
 
-from torchvision import datasets
-import torchvision.transforms as transforms
-
-
-#%%
-batch_size = 20
-
-# convert data to torch.FloatTensor
-transform = transforms.ToTensor()
-
-# choose the training and test datasets
-train_data = datasets.MNIST(root='data', train=True,
-                                   download=True, transform=transform)
-test_data = datasets.MNIST(root='data', train=False,
-                                  download=True, transform=transform)
-
-# prepare data loaders
-train_loader = torch.utils.data.DataLoader(train_data, batch_size = batch_size, num_workers=0)
-test_loader = torch.utils.data.DataLoader(test_data, batch_size = batch_size, num_workers=0)
-
-
-# obtain one batch of training images
-dataiter = iter(train_loader)
-images, labels = dataiter.next()
-
-#%%
 
 class ConvLassoNet(nn.Module):
     def __init__(self, lambda_ = 1., M = 1., D_in = 784, D_out = 10):
+        """
+        LassoNet applied after a first layer of convolutions. See https://jmlr.org/papers/volume22/20-848/20-848.pdf for details.
+
+        Parameters
+        ----------
+        lambda_ : float, optional
+            Penalty parameter for the skip layer. The default is 1.
+            By setting to ``None``, the LassoNet penalty is deactivated.
+        M : float, optional
+            Penalty parameter for the hierarchical constraint. The default is 1.
+        D_in : int, optional
+            input dimension of the model. The default is 784.
+        D_out : int, optional
+            output dimension of the model. The default is 10.
+
+        Returns
+        -------
+        None.
+
+        """
         
         super(ConvLassoNet, self).__init__()
         
@@ -48,7 +40,7 @@ class ConvLassoNet(nn.Module):
         self.lambda_ = lambda_
         self.M = M
         
-        assert self.lambda_ > 0, "lambda_ needs to be positive"
+        assert (self.lambda_ is None) or (self.lambda_ > 0), "lambda_ must be None or positive"
         assert self.M > 0, "M needs to be positive (possibly np.inf)"
         
         # hyperparameters
@@ -60,7 +52,9 @@ class ConvLassoNet(nn.Module):
         
         # first conv layer and skip layer
         self.conv1 = nn.Conv2d(1, self.out_channels, kernel_size=5, stride=1, padding=2)
-        self.skip = nn.Linear(self.out_channels*self.D_in, self.D_out)
+        
+        if self.lambda_ is not None:
+            self.skip = nn.Linear(self.out_channels*self.D_in, self.D_out)
         
         # remaining nonlinear part (after conv1)
         self.relu = nn.ReLU()
@@ -81,8 +75,12 @@ class ConvLassoNet(nn.Module):
         out = self.conv1(x)
         self.m1 = out.size(2)
         self.m2 = out.size(3)
-        z1 = self.skip(out.reshape(-1, self.out_channels*self.m1*self.m2))
         
+        if self.lambda_ is not None:
+            z1 = self.skip(out.reshape(-1, self.out_channels*self.m1*self.m2))
+        else: 
+            z1 = 0.
+            
         # rest of non-linear part: can be adapted freely
         out = self.relu(out)
         out = self.maxpool(out)
@@ -109,9 +107,37 @@ class ConvLassoNet(nn.Module):
     def do_training(self, loss, dl, opt = None, n_epochs = 10, lr_schedule = None, valid_dl = None,\
                     preprocess = None, verbose = True):
         """
+
+        Parameters
+        ----------
+        loss : ``torch.nn`` loss function
+            Loss function for the model.
+        dl : ``torch.utils.data.DataLoader``
+            DataLoader with the training data.
+        opt : from ``torch.optim``, optional
+            Pytorch optimizer. The default is SGD with Nesterov momentum and learning rate 0.001.
+        n_epochs : int, optional
+            Number of epochs for training. The default is 10.
+        lr_schedule : from ``torch.optim.lr_scheduler``, optional
+            Learning rate schedule. Step is taken after each epoch. The default is None.
+        valid_dl : ``torch.utils.data.DataLoader``, optional
+            DataLoader for validation loss. One sample is taken at end of each epoch. The default is None.
+        preprocess : function, optional
+            A function for preprocessing the inputs for the model. The default is None.
+        verbose : boolean, optional
+            Verbosity. The default is True.
+
+        Returns
+        -------
+        info : dict
+            Training and validation loss and accuracy history.
+
         """
         if opt is None:
             opt = torch.optim.SGD(self.parameters(), lr = 0.001, momentum = 0.9, nesterov = True)
+        
+        if verbose:
+            print(opt)    
         
         info = {'train_loss':[],'valid_loss':[],'train_acc':[],'valid_acc':[]}
         
@@ -140,10 +166,10 @@ class ConvLassoNet(nn.Module):
                 # step size
                 alpha = opt.state_dict()['param_groups'][0]['lr']
                 # prox step
-                if self.M < np.inf:
+                if self.lambda_ is not None:
                     self.prox(alpha)
-            
-                print(f"Epoch {j+1}/{n_epochs}: \t  train loss: {loss_val.item()}")
+                    
+                print(loss_val.item())
             
             ################### END OF EPOCH ###################
             if lr_schedule is not None:
@@ -164,64 +190,16 @@ class ConvLassoNet(nn.Module):
             
             info['train_loss'].append(loss_val.item())
             info['train_acc'].append(acc.item())
-            info['valid_loss'].append(v_loss.item())
-            info['valid_acc'].append(v_correct.item())
+            if valid_dl is not None:
+                info['valid_loss'].append(v_loss.item())
+                info['valid_acc'].append(v_correct.item())
             
             if verbose:
                 print(f"Epoch {j+1}/{n_epochs}: \t  train loss: {loss_val.item()}, \t train accuracy: {acc.item()}.")
-                
+                print(opt)    
             
         return info
         
 
-        
-#%% TRAINING
 
-# n_epoch = 1
-# alpha0 = 1e-3
-
-# all_loss = list()
-# #optimizer = torch.optim.Adam(model.parameters(), lr=alpha0)
-# optimizer = torch.optim.SGD(model.parameters(), lr = alpha0, momentum = 0.9, nesterov = True)
-
-# scheduler = StepLR(optimizer, step_size=1, gamma=0.5)
-
-# for j in np.arange(n_epoch):
-#     print(f"EPOCH {j}")
-#     for images, labels in train_loader:
-            
-#         # forward pass
-#         y_pred = model.forward(images)    
-#         # compute loss.
-#         loss = loss_fn(y_pred, labels)           
-#         # zero gradients
-#         optimizer.zero_grad()    
-#         # backward pass
-#         loss.backward()    
-#         # iteration
-#         optimizer.step()
-#         # step size
-#         alpha = optimizer.state_dict()['param_groups'][0]['lr']
-#         # prox step
-#         model.prox(alpha)
-        
-#     # decrease step size
-#     if j%10 ==0:
-#         scheduler.step()
-    
-#     print("loss:", loss.item())
-#     all_loss.append(loss.item())
-
-
-#%% reshaping
-#batch,out_channels,m1,m2
-# H=torch.randn(3, 5, 4, 4)
-
-# h=H.reshape(3, -1)
-
-# j = 2
-
-# H[0,j,:,:]
-
-# h[0, 16*j:16*(j+1)].reshape(4,4)
 

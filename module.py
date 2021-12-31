@@ -61,8 +61,26 @@ def hier_prox(v, u, lambda_, lambda_bar, M):
 class LassoNet(torch.nn.Module):
     def __init__(self, G, lambda_ = 0.01, M = 10, theta_bias = False):
         """
-        G is a torch object itself
-        G needs to have a linear layer at the beginning called G.W1
+        Implementation of LassoNet for arbitrary architecture. See https://jmlr.org/papers/volume22/20-848/20-848.pdf for details.
+
+        Parameters
+        ----------
+        G : ``torch.nn.Module``
+            The nonlinear part of LassoNet. Needs the following attributes:
+                * ``self.W1`` : the linear layer applied to the inputs. This is called W^(1) in the LassoNet paper.
+                * ``self.D_in`` : dimension of input
+                * ``self.D_out`` : dimension of output
+        lambda_ : float, optional
+            Penalty parameter for the skip layer. The default is 1.
+        M : float, optional
+            Penalty parameter for the hierarchical constraint. The default is 1.
+        theta_bias : boolean, optional
+            Whether the skip connection has a bias.
+        
+        Returns
+        -------
+        None.
+
         """
         super().__init__()
         
