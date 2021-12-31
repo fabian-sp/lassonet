@@ -13,7 +13,7 @@ from torchvision import datasets
 import torchvision.transforms as transforms
 
 #%%
-batch_size = 20
+batch_size = 128
 
 # convert data to torch.FloatTensor
 transform = transforms.ToTensor()
@@ -26,7 +26,7 @@ test_data = datasets.MNIST(root='data', train=False,
 
 # prepare data loaders
 train_loader = torch.utils.data.DataLoader(train_data, batch_size = batch_size, num_workers=0)
-test_loader = torch.utils.data.DataLoader(test_data, batch_size = 200, num_workers=0)
+test_loader = torch.utils.data.DataLoader(test_data, batch_size = 512, num_workers=0)
 
 
 # obtain one batch of training images
@@ -48,10 +48,10 @@ for param in model.parameters():
     print(param.size())
 
 #%%
-n_epochs = 2
+n_epochs = 5
 loss = torch.nn.CrossEntropyLoss()
 
-alpha0 = 0.001
+alpha0 = 0.01
 
 #%% training
 
@@ -66,10 +66,10 @@ train_info = model.do_training(loss, train_loader, opt = opt, n_epochs = n_epoch
 
 model2 = ConvLassoNet(lambda_ = None, M = 1., D_in = 784, D_out = 10)
 
-opt = torch.optim.SGD(model2.parameters(), lr = alpha0, momentum = 0.9, nesterov = True)
-sched = StepLR(opt, step_size=1, gamma=0.5)
+opt2 = torch.optim.SGD(model2.parameters(), lr = alpha0, momentum = 0.9, nesterov = True)
+sched2 = StepLR(opt2, step_size=1, gamma=0.5)
 
-train_info2 = model2.do_training(loss, train_loader, opt = opt, n_epochs = n_epochs, lr_schedule = sched, valid_dl = test_loader,\
+train_info2 = model2.do_training(loss, train_loader, opt = opt2, n_epochs = n_epochs, lr_schedule = sched2, valid_dl = test_loader,\
                                  verbose = True)
 
 
@@ -79,11 +79,11 @@ train_info2 = model2.do_training(loss, train_loader, opt = opt, n_epochs = n_epo
 #     print(param.data)
 
 fig, ax = plt.subplots()
-ax.plot(train_info['train_loss'], c = '#002635', markerstyle = 'o', label = 'Training loss')
-ax.plot(train_info['valid_loss'], c = '#002635', markerstyle = 'x', ls = '--', label = 'Validation loss')
+ax.plot(train_info['train_loss'], c = '#002635', marker = 'o', label = 'Training loss')
+ax.plot(train_info['valid_loss'], c = '#002635', marker = 'x', ls = '--', label = 'Validation loss')
 
-ax.plot(train_info2['train_loss'], c = '#AB1A25', markerstyle = 'o', label = 'Training loss (uncon.)')
-ax.plot(train_info2['valid_loss'], c = '#AB1A25', markerstyle = 'x', ls = '--', label = 'Validation loss (uncon.)')
+ax.plot(train_info2['train_loss'], c = '#AB1A25', marker = 'o', label = 'Training loss (uncon.)')
+ax.plot(train_info2['valid_loss'], c = '#AB1A25', marker = 'x', ls = '--', label = 'Validation loss (uncon.)')
 
 ax.set_xlabel('Epoch')
 ax.legend()
@@ -107,7 +107,7 @@ def plot_filter(model, axs = None, cmap = plt.cm.cividis, vmin = -0.5, vmax = 0.
     return fig
 
 
-fig = plot_filter(model2, axs = None, cmap = plt.cm.cividis, vmin = -0.5, vmax = 0.5)
+fig = plot_filter(model2, axs = None, cmap = plt.cm.cividis, vmin = -0.3, vmax = 0.3)
 
 #%% plot skip layer weights
 
