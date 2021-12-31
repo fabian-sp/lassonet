@@ -88,7 +88,8 @@ ax.plot(train_info2['valid_loss'], c = '#AB1A25', marker = 'x', ls = '--', label
 ax.set_xlabel('Epoch')
 ax.legend()
 
-
+##013440
+##D97925
 
 #%% plot Conv filter weights
 
