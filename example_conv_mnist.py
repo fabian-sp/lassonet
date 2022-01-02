@@ -69,7 +69,7 @@ model2 = ConvLassoNet(lambda_ = None, M = 1., D_in = 784, D_out = 10)
 opt2 = torch.optim.SGD(model2.parameters(), lr = alpha0, momentum = 0.9, nesterov = True)
 sched2 = StepLR(opt2, step_size=1, gamma=0.5)
 
-train_info2 = model2.do_training(loss, train_loader, opt = opt2, n_epochs = n_epochs, lr_schedule = sched2, valid_dl = test_loader,\
+train_info2 = model2.do_training(loss, train_loader, opt = opt2, n_epochs = n_epochs, lr_schedule = None, valid_dl = test_loader,\
                                  verbose = True)
 
 

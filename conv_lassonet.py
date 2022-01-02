@@ -121,7 +121,7 @@ class ConvLassoNet(nn.Module):
         lr_schedule : from ``torch.optim.lr_scheduler``, optional
             Learning rate schedule. Step is taken after each epoch. The default is None.
         valid_dl : ``torch.utils.data.DataLoader``, optional
-            DataLoader for validation loss. One sample is taken at end of each epoch. The default is None.
+            DataLoader for validation loss. One sample is taken over the course of an epoch, then mean loss/accuracy is stored. The default is None.
         preprocess : function, optional
             A function for preprocessing the inputs for the model. The default is None.
         verbose : boolean, optional
@@ -130,7 +130,7 @@ class ConvLassoNet(nn.Module):
         Returns
         -------
         info : dict
-            Training and validation loss and accuracy history.
+            Training and validation loss and accuracy history. Each entry is the loss/accuracy averaged over one epoch.
 
         """
         if opt is None:
@@ -146,7 +146,12 @@ class ConvLassoNet(nn.Module):
             assert len(valid_iter) >= n_epochs, "Validation DataLoader needs to have more items than number of epochs."
 
         for j in np.arange(n_epochs):
-              
+            
+            ################### SETUP FOR EPOCH ##################
+            all_loss = list(); all_acc = list()
+            all_vl_loss = list(); all_vl_acc = list()
+            v_inputs, v_targets = valid_iter.next()  
+            
             ################### START OF EPOCH ###################
             self.train()
             for inputs, targets in dl:
@@ -168,34 +173,38 @@ class ConvLassoNet(nn.Module):
                 # prox step
                 if self.lambda_ is not None:
                     self.prox(alpha)
-                    
+                
+                ## COMPUTE ACCURACY AND STORE 
                 print(loss_val.item())
+                scores, predictions = torch.max(y_pred.data, 1)
+                all_loss.append(loss_val.item())
+                all_acc.append((predictions == targets).float().mean())
+                
+                ### VALIDATION
+                if valid_dl is not None:
+                    self.eval()
+                    output = self.forward(v_inputs)
+                    v_loss = loss(output, v_targets)
+                    v_scores, v_predictions = torch.max(output.data, 1)
+                    v_correct = (v_predictions == v_targets).float().mean()
+                    
+                    all_vl_loss.append(v_loss.item())
+                    all_vl_acc.append(v_correct.item())
             
             ################### END OF EPOCH ###################
             if lr_schedule is not None:
                 lr_schedule.step()    
-                          
-            ### VALIDATION
-            if valid_dl is not None:
-                self.eval()
-                v_inputs, v_targets = valid_iter.next()                
-                output = self.forward(v_inputs)
-                v_loss = loss(output, v_targets)
-                v_scores, v_predictions = torch.max(output.data, 1)
-                v_correct = (v_predictions == v_targets).float().mean()
-            
+                
             ### STORE
-            scores, predictions = torch.max(y_pred.data, 1)
-            acc = (predictions == targets).float().mean()
             
-            info['train_loss'].append(loss_val.item())
-            info['train_acc'].append(acc.item())
+            info['train_loss'].append(np.mean(all_loss))
+            info['train_acc'].append(np.mean(all_acc))
             if valid_dl is not None:
-                info['valid_loss'].append(v_loss.item())
-                info['valid_acc'].append(v_correct.item())
+                info['valid_loss'].append(np.mean(all_vl_loss))
+                info['valid_acc'].append(np.mean(all_vl_acc))
             
             if verbose:
-                print(f"Epoch {j+1}/{n_epochs}: \t  train loss: {loss_val.item()}, \t train accuracy: {acc.item()}.")
+                print(f"Epoch {j+1}/{n_epochs}: \t  train loss: {np.mean(all_loss)}, \t train accuracy: {np.mean(all_acc)}.")
                 print(opt)    
             
         return info
