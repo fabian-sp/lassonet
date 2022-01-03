@@ -59,7 +59,7 @@ def hier_prox(v, u, lambda_, lambda_bar, M):
 #%% own implementation of LassoNet
 
 class LassoNet(torch.nn.Module):
-    def __init__(self, G, lambda_ = 0.01, M = 10, theta_bias = False):
+    def __init__(self, G, lambda_ = 0.01, M = 10, skip_bias = False):
         """
         Implementation of LassoNet for arbitrary architecture. See https://jmlr.org/papers/volume22/20-848/20-848.pdf for details.
 
@@ -74,7 +74,7 @@ class LassoNet(torch.nn.Module):
             Penalty parameter for the skip layer. The default is 1.
         M : float, optional
             Penalty parameter for the hierarchical constraint. The default is 1.
-        theta_bias : boolean, optional
+        skip_bias : boolean, optional
             Whether the skip connection has a bias.
         
         Returns
@@ -90,7 +90,7 @@ class LassoNet(torch.nn.Module):
         self.D_in = self.G.D_in
         self.D_out = self.G.D_out
         
-        self.skip = torch.nn.Linear(self.D_in, self.D_out, bias = theta_bias) # skip connection aka theta
+        self.skip = torch.nn.Linear(self.D_in, self.D_out, bias = skip_bias) # skip connection aka theta
         return
     
     def forward(self, x):

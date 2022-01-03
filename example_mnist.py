@@ -89,10 +89,10 @@ prep = lambda x: x.reshape(-1,28*28)
 info = model.do_training(loss, train_loader, opt = opt, lr_schedule = sched, n_epochs = 5,\
                              preprocess = prep, verbose = True)
 
-for param in model.parameters():
-    print(param.data)
+# for param in model.parameters():
+#     print(param.data)
 
-print("theta: ", model.skip.weight.data)
+print("Skip layer weights: ", model.skip.weight.data)
 
 #%% evaluation
 
@@ -103,7 +103,7 @@ plt.figure()
 plt.imshow(G.W1.weight.data, cmap = "coolwarm")
 
 
-importance = model.skip.weight.data[7,:].view(28,28).numpy()
+importance = model.skip.weight.data[8,:].view(28,28).numpy()
 plt.figure()
 plt.imshow(importance, cmap = "coolwarm")#, vmin = -0.0001, vmax = 0.0001)
 

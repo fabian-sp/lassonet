@@ -75,7 +75,7 @@ l1 = 3.
 M = 1.
 
 G = FeedForward(D_in, D_out)
-model = LassoNet(G, lambda_ = l1, M = M, theta_bias = True)
+model = LassoNet(G, lambda_ = l1, M = M, skip_bias = True)
 
 loss = torch.nn.MSELoss(reduction='mean')
 
@@ -100,7 +100,7 @@ info = model.do_training(loss, dl, opt = opt, lr_schedule = sched, n_epochs = n_
 
 #%% Evaluation
 
-print("theta: ", model.skip.weight.data)
+print("Skip layer weights: ", model.skip.weight.data)
 
 plt.figure()
 plt.plot(info['train_loss'])
