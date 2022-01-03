@@ -35,10 +35,10 @@ images, labels = dataiter.next()
 
 
 #%% the actual model
-l1 = 5.
-M = 10.
+l1 = 2.
+M = 20.
 
-model = ConvLassoNet(lambda_ = l1, M = M, D_in = 784, D_out = 10)
+model = ConvLassoNet(lambda_ = l1, M = M, D_in = (28,28), D_out = 10)
 
 # test forward method, reshape input to vector with view
 model.forward(images).size()
@@ -58,13 +58,13 @@ alpha0 = 0.01
 opt = torch.optim.SGD(model.parameters(), lr = alpha0, momentum = 0.9, nesterov = True)
 sched = StepLR(opt, step_size=1, gamma=0.5)
 
-train_info = model.do_training(loss, train_loader, opt = opt, n_epochs = n_epochs, lr_schedule = sched, valid_dl = test_loader,\
+train_info = model.do_training(loss, train_loader, opt = opt, n_epochs = n_epochs, lr_schedule = None, valid_dl = test_loader,\
                                verbose = True)
 
 
 #%% training of model without penalty
 
-model2 = ConvLassoNet(lambda_ = None, M = 1., D_in = 784, D_out = 10)
+model2 = ConvLassoNet(lambda_ = None, M = 1., D_in = (28,28), D_out = 10)
 
 opt2 = torch.optim.SGD(model2.parameters(), lr = alpha0, momentum = 0.9, nesterov = True)
 sched2 = StepLR(opt2, step_size=1, gamma=0.5)
@@ -93,7 +93,7 @@ ax.legend()
 
 #%% plot Conv filter weights
 
-def plot_filter(model, axs = None, cmap = plt.cm.cividis, vmin = -0.5, vmax = 0.5):
+def plot_filter(model, axs = None, cmap = plt.cm.cividis, vmin = None, vmax = None):
     
     conv_filter = model.conv1.weight.data
     if axs is None:
@@ -108,11 +108,22 @@ def plot_filter(model, axs = None, cmap = plt.cm.cividis, vmin = -0.5, vmax = 0.
     return fig
 
 
-fig = plot_filter(model2, axs = None, cmap = plt.cm.cividis, vmin = -0.3, vmax = 0.3)
+fig = plot_filter(model, axs = None, cmap = plt.cm.cividis)
 
 #%% plot skip layer weights
 
+skip_weight = model.skip.weight.data.numpy().copy()
+
+label = 8
+
+T = skip_weight[label,:]
 
 
+fig, axs = plt.subplots(4,8)
 
+for j in np.arange(model.out_channels):
+    ax = axs.ravel()[j]
+    ax.imshow(T[model.h_out*model.w_out*j:model.h_out*model.w_out*(j+1)].reshape(model.h_out,model.w_out), cmap = cmap)
+    ax.axis('off')
+    ax.set_title(f'Filter {j}')
 

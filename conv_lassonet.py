@@ -10,9 +10,32 @@ import torch.nn as nn
 
 from module import hier_prox
 
+# from: https://discuss.pytorch.org/t/utility-function-for-calculating-the-shape-of-a-conv-output/11173/6
+def conv_output_shape(h_w, kernel_size=1, stride=1, pad=0, dilation=1):
+    """
+    Utility function for computing output of convolutions
+    takes a tuple of (h,w) and returns a tuple of (h,w)
+    """
+    
+    if type(h_w) is not tuple:
+        h_w = (h_w, h_w)
+    
+    if type(kernel_size) is not tuple:
+        kernel_size = (kernel_size, kernel_size)
+    
+    if type(stride) is not tuple:
+        stride = (stride, stride)
+    
+    if type(pad) is not tuple:
+        pad = (pad, pad)
+    
+    h = (h_w[0] + (2 * pad[0]) - (dilation * (kernel_size[0] - 1)) - 1)// stride[0] + 1
+    w = (h_w[1] + (2 * pad[1]) - (dilation * (kernel_size[1] - 1)) - 1)// stride[1] + 1
+    
+    return h, w
 
 class ConvLassoNet(nn.Module):
-    def __init__(self, lambda_ = 1., M = 1., D_in = 784, D_out = 10):
+    def __init__(self, lambda_ = 1., M = 1., D_in = (28,28), D_out = 10, kernel_size=5, stride=1, padding=2, dilation=1):
         """
         LassoNet applied after a first layer of convolutions. See https://jmlr.org/papers/volume22/20-848/20-848.pdf for details.
 
@@ -49,12 +72,13 @@ class ConvLassoNet(nn.Module):
         
         self.D_in = D_in
         self.D_out = D_out
+        self.conv1_output_dim(kernel_size, stride, padding, dilation)
         
         # first conv layer and skip layer
-        self.conv1 = nn.Conv2d(1, self.out_channels, kernel_size=5, stride=1, padding=2)
+        self.conv1 = nn.Conv2d(1, self.out_channels, kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation)
         
         if self.lambda_ is not None:
-            self.skip = nn.Linear(self.out_channels*self.D_in, self.D_out)
+            self.skip = nn.Linear(self.out_channels*self.h_out*self.w_out, self.D_out)
         
         # remaining nonlinear part (after conv1)
         self.relu = nn.ReLU()
@@ -70,14 +94,20 @@ class ConvLassoNet(nn.Module):
         self.fc2 = nn.Linear(1000, self.D_out)
         
         return
+    
+    def conv1_output_dim(self, kernel_size, stride, padding, dilation):
+        """ computes output diimension of conv1; needed for dimensionality of skip layer
+        """
+        self.kernel_size = kernel_size        
+        self.h_out, self.w_out = conv_output_shape(self.D_in, kernel_size, stride, padding, dilation)
+        
+        return
         
     def forward(self, x):
         out = self.conv1(x)
-        self.m1 = out.size(2)
-        self.m2 = out.size(3)
         
         if self.lambda_ is not None:
-            z1 = self.skip(out.reshape(-1, self.out_channels*self.m1*self.m2))
+            z1 = self.skip(out.reshape(-1, self.out_channels*self.h_out*self.w_out))
         else: 
             z1 = 0.
             
@@ -94,12 +124,12 @@ class ConvLassoNet(nn.Module):
     def prox(self, lr):
         # loop through output channels / filters
         for j in range(self.out_channels):
-            theta_j = self.skip.weight.data[:,self.m1*self.m2*j:self.m1*self.m2*(j+1)].reshape(-1)
+            theta_j = self.skip.weight.data[:,self.h_out*self.w_out*j:self.h_out*self.w_out*(j+1)].reshape(-1)
             filter_j = self.conv1.weight[j,0,:,:].reshape(-1)
             
             theta_j, filter_j = hier_prox(theta_j, filter_j, lambda_=self.lambda_*lr, lambda_bar=0, M = self.M)
             
-            self.skip.weight.data[:,self.m1*self.m2*j:self.m1*self.m2*(j+1)] = theta_j.reshape(self.D_out, -1)
+            self.skip.weight.data[:,self.h_out*self.w_out*j:self.h_out*self.w_out*(j+1)] = theta_j.reshape(self.D_out, -1)
             self.conv1.weight.data[j,0,:,:] = filter_j.reshape(self.kernel_size, self.kernel_size) #replace with self.kernel_size
                       
         return
@@ -175,7 +205,7 @@ class ConvLassoNet(nn.Module):
                     self.prox(alpha)
                 
                 ## COMPUTE ACCURACY AND STORE 
-                print(loss_val.item())
+                #print(loss_val.item())
                 scores, predictions = torch.max(y_pred.data, 1)
                 all_loss.append(loss_val.item())
                 all_acc.append((predictions == targets).float().mean())
