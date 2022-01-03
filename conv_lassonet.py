@@ -180,7 +180,8 @@ class ConvLassoNet(nn.Module):
             ################### SETUP FOR EPOCH ##################
             all_loss = list(); all_acc = list()
             all_vl_loss = list(); all_vl_acc = list()
-            v_inputs, v_targets = valid_iter.next()  
+            if valid_dl is not None:
+                v_inputs, v_targets = valid_iter.next()  
             
             ################### START OF EPOCH ###################
             self.train()

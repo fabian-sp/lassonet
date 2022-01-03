@@ -86,8 +86,11 @@ ax.plot(train_info2['train_loss'], c = '#AB1A25', marker = 'o', label = 'Trainin
 ax.plot(train_info2['valid_loss'], c = '#AB1A25', marker = 'x', ls = '--', label = 'Validation loss (uncon.)')
 
 ax.set_xlabel('Epoch')
+ax.set_ylim(0,)
 ax.legend()
+fig.suptitle('Loss with and without LassoNet constraint')
 
+#fig.savefig('plots/conv_loss.png', dpi = 400)
 ##013440
 ##D97925
 
@@ -105,8 +108,15 @@ def plot_filter(model, cmap = plt.cm.cividis, vmin = None, vmax = None):
 
     return 
 
+v_ = 0.4
+
 fig, axs = plt.subplots(4,8)
-plot_filter(model, cmap=plt.cm.viridis, vmin=-0.3, vmax=0.3)
+plot_filter(model, cmap=plt.cm.RdBu, vmin=-v_, vmax=v_)
+#fig.savefig('plots/conv_filter.png', dpi = 400)
+
+fig, axs = plt.subplots(4,8)
+plot_filter(model2, cmap=plt.cm.RdBu, vmin=-v_, vmax=v_)
+#fig.savefig('plots/conv_filter_unc.png', dpi = 400)
 
 #%% plot skip layer weights
 
@@ -117,7 +127,8 @@ def plot_skip(model, label, cmap = plt.cm.cividis, vmin = None, vmax = None):
         
     for j in np.arange(model.out_channels):
         ax = axs.ravel()[j]
-        ax.imshow(T[model.h_out*model.w_out*j:model.h_out*model.w_out*(j+1)].reshape(model.h_out,model.w_out), cmap = cmap)
+        ax.imshow(T[model.h_out*model.w_out*j:model.h_out*model.w_out*(j+1)].reshape(model.h_out,model.w_out),\
+                  cmap = cmap, vmin = vmin, vmax = vmax)
         ax.axis('off')
         ax.set_title(f'filter {j}', fontsize = 8)
 
@@ -127,4 +138,5 @@ label = 8
 
 fig, axs = plt.subplots(4,8)
 fig.suptitle(f'Linear weights of convolution output for digit {label}')
-plot_skip(model, label, cmap = plt.cm.cividis, vmin = None, vmax = None)
+plot_skip(model, label, cmap = plt.cm.cividis, vmin = -2e-4, vmax = 2e-4)
+#fig.savefig(f'plots/conv_skip_{label}.png', dpi = 400)

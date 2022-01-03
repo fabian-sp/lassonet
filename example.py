@@ -87,24 +87,23 @@ for param in model.parameters():
 #%% Training
 
 n_epochs = 100
-alpha0 = 1e-3 #initial step size/learning rate
+alpha0 = 1e-2 #initial step size/learning rate
 
 all_loss = list()
 
 #opt = torch.optim.Adam(model.parameters(), lr = alpha0)
 opt = torch.optim.SGD(model.parameters(), lr = alpha0, momentum = 0.9, nesterov = True)
-
 sched = StepLR(opt, step_size = 30, gamma = 0.5)
 
 
-all_loss = model.do_training(loss, dl, opt = opt, lr_schedule = sched, n_epochs = n_epochs, verbose = True)
+info = model.do_training(loss, dl, opt = opt, lr_schedule = sched, n_epochs = n_epochs, verbose = True)
 
 #%% Evaluation
 
 print("theta: ", model.skip.weight.data)
 
 plt.figure()
-plt.plot(all_loss)
+plt.plot(info['train_loss'])
 
 plt.figure()
 plt.imshow(G.W1.weight.data, cmap = "coolwarm", vmin = -.1, vmax = .1)

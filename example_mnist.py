@@ -1,5 +1,4 @@
 """
-adapted from this tutorial: https://github.com/ozx1812/MNIST-PyTorch/blob/master/mnist_mlp_pytorch.py
 """
 
 import numpy as np
@@ -12,9 +11,8 @@ from module import LassoNet
 from torchvision import datasets
 import torchvision.transforms as transforms
 
-
 #%%
-batch_size = 20
+batch_size = 50
 
 # convert data to torch.FloatTensor
 transform = transforms.ToTensor()
@@ -79,7 +77,7 @@ for param in model.parameters():
     
 #%% training
 
-alpha0 = 1e-3
+alpha0 = 1e-2
 
 #opt = torch.optim.Adam(model.parameters(), lr=alpha0)
 opt = torch.optim.SGD(model.parameters(), lr = alpha0, momentum = 0.9, nesterov = True)
@@ -88,7 +86,7 @@ sched = StepLR(opt, step_size=1, gamma=0.5)
 
 prep = lambda x: x.reshape(-1,28*28)
 
-all_loss = model.do_training(loss, train_loader, opt = opt, lr_schedule = sched, n_epochs = 20,\
+info = model.do_training(loss, train_loader, opt = opt, lr_schedule = sched, n_epochs = 5,\
                              preprocess = prep, verbose = True)
 
 for param in model.parameters():
@@ -96,15 +94,15 @@ for param in model.parameters():
 
 print("theta: ", model.skip.weight.data)
 
-#%%
+#%% evaluation
+
 plt.figure()
-plt.plot(all_loss)
+plt.plot(info['train_loss'])
 
 plt.figure()
 plt.imshow(G.W1.weight.data, cmap = "coolwarm")
 
 
-#importance = model.skip.weight.data.mean(dim=0).view(28,28).numpy()
 importance = model.skip.weight.data[7,:].view(28,28).numpy()
 plt.figure()
 plt.imshow(importance, cmap = "coolwarm")#, vmin = -0.0001, vmax = 0.0001)

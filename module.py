@@ -98,23 +98,59 @@ class LassoNet(torch.nn.Module):
         y2 = self.skip(x)
         return y1+y2
     
-    def do_training(self, loss, dl, opt = None, lr_schedule = None, n_epochs = 10, preprocess = None, verbose = True):
+    def do_training(self, loss, dl, opt = None, n_epochs = 10, lr_schedule = None, valid_dl = None,\
+                    preprocess = None, verbose = True):
         """
-        dl:             PyTorch DataLoader
-        loss:           PyTorch loss function
-        opt:            PyTorch optimizer
-        lr_schedule:    PyTorch learning rate scheduler
-        preprocess:     function before inputting, e.g. reshping image into vector
+
+        Parameters
+        ----------
+        loss : ``torch.nn`` loss function
+            Loss function for the model.
+        dl : ``torch.utils.data.DataLoader``
+            DataLoader with the training data.
+        opt : from ``torch.optim``, optional
+            Pytorch optimizer. The default is SGD with Nesterov momentum and learning rate 0.001.
+        n_epochs : int, optional
+            Number of epochs for training. The default is 10.
+        lr_schedule : from ``torch.optim.lr_scheduler``, optional
+            Learning rate schedule. Step is taken after each epoch. The default is None.
+        valid_dl : ``torch.utils.data.DataLoader``, optional
+            DataLoader for validation loss. One sample is taken over the course of an epoch, then mean loss/accuracy is stored. The default is None.
+        preprocess : function, optional
+            A function for preprocessing the inputs for the model. The default is None.
+        verbose : boolean, optional
+            Verbosity. The default is True.
+
+        Returns
+        -------
+        info : dict
+            Training and validation loss and accuracy history. Each entry is the loss/accuracy averaged over one epoch.
+
         """
         if opt is None:
             opt = torch.optim.SGD(self.parameters(), lr = 0.001, momentum = 0.9, nesterov = True)
         
-        all_loss = list()
+        if verbose:
+            print(opt)    
+        
+        info = {'train_loss':[],'valid_loss':[],'train_acc':[],'valid_acc':[]}
+        
+        if valid_dl is not None:
+            valid_iter = iter(valid_dl)
+            assert len(valid_iter) >= n_epochs, "Validation DataLoader needs to have more items than number of epochs."
 
         for j in np.arange(n_epochs):
             
+            ################### SETUP FOR EPOCH ##################
+            all_loss = list(); all_acc = list()
+            all_vl_loss = list(); all_vl_acc = list()
+            
+            if valid_dl is not None:
+                v_inputs, v_targets = valid_iter.next()  
+            
+            ################### START OF EPOCH ###################
+            self.train()
             for inputs, targets in dl:
-                
                 if preprocess is not None:
                     inputs = preprocess(inputs)
                 
@@ -134,12 +170,38 @@ class LassoNet(torch.nn.Module):
                 self.skip.weight.data, self.G.W1.weight.data = hier_prox(self.skip.weight.data, self.G.W1.weight.data,\
                                                                             lambda_=self.lambda_*alpha, lambda_bar=0, M = self.M)
                 
-            if lr_schedule is not None:
-                lr_schedule.step()
+                ## COMPUTE ACCURACY AND STORE 
+                #print(loss_val.item())
+                scores, predictions = torch.max(y_pred.data, 1)
+                all_loss.append(loss_val.item())
+                all_acc.append((predictions == targets).float().mean())
                 
-            if verbose:
-                print(f"Epoch {j}, loss:", loss_val.item())
-                
-            all_loss.append(loss_val.item())
+                ### VALIDATION
+                if valid_dl is not None:
+                    self.eval()
+                    output = self.forward(v_inputs)
+                    v_loss = loss(output, v_targets)
+                    v_scores, v_predictions = torch.max(output.data, 1)
+                    v_correct = (v_predictions == v_targets).float().mean()
+                    
+                    all_vl_loss.append(v_loss.item())
+                    all_vl_acc.append(v_correct.item())
             
-        return all_loss
+            ################### END OF EPOCH ###################
+            if lr_schedule is not None:
+                lr_schedule.step()    
+                
+            ### STORE
+            
+            info['train_loss'].append(np.mean(all_loss))
+            info['train_acc'].append(np.mean(all_acc))
+            if valid_dl is not None:
+                info['valid_loss'].append(np.mean(all_vl_loss))
+                info['valid_acc'].append(np.mean(all_vl_acc))
+            
+            if verbose:
+                print(f"Epoch {j+1}/{n_epochs}: \t  train loss: {np.mean(all_loss)}, \t train accuracy: {np.mean(all_acc)}.")
+                print(opt)    
+            
+        return info
+    
