@@ -57,7 +57,7 @@ We use the MNIST dataset to illustrate how Convolutional LassoNet works. We use 
 
 <img src="conv_architecture.png" alt="Network architecture" width="700"/>
 
-We set `M=20` and `lambda=4` which worked well but could be tuned of course. We first plot training and validation loss of the unconstrained model (denoted by *unc.*) and the one with LassoNet constraint. They are quite similar (so the additional constraint does not impede learning too much), and interestingely the LassoNet seems to have smaller loss during the first epochs.
+We set `M=20` and `lambda=4` which worked well but could be tuned of course. We first plot training and validation loss of the unconstrained model (denoted by *uncon.*) and the one with LassoNet constraint. They are quite similar (so the additional constraint does not impede learning too much), and interestingely the LassoNet seems to have smaller loss during the first epochs.
 
 <img src="conv_loss.png" alt="Loss history" width="700"/>
 
@@ -71,7 +71,7 @@ Compare this to the learned filters of the ConvLassoNet model:
 
 Clearly, adding the LassoNet constraint leads to filter sparsity but also to a shrinkage effect (similar as the standard Lasso). Finally, we look at the learned weights of the skip layer, now for the digit 8. These show us, for each filter, what the linear effect of the convolution output is with respect to the probability of the image showing the digit 8.
 
-<img src="conv_skip.png" width="700"/>
+<img src="conv_skip_8.png" width="700"/>
 
 ### Implementation details
 
