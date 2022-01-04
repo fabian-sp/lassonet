@@ -130,8 +130,7 @@ class ConvLassoNet(nn.Module):
             theta_j, filter_j = hier_prox(theta_j, filter_j, lambda_=self.lambda_*lr, lambda_bar=0, M = self.M)
             
             self.skip.weight.data[:,self.h_out*self.w_out*j:self.h_out*self.w_out*(j+1)] = theta_j.reshape(self.D_out, -1)
-            self.conv1.weight.data[j,0,:,:] = filter_j.reshape(self.kernel_size, self.kernel_size) #replace with self.kernel_size
-                      
+            self.conv1.weight.data[j,0,:,:] = filter_j.reshape(self.kernel_size, self.kernel_size) 
         return
     
     def do_training(self, loss, dl, opt = None, n_epochs = 10, lr_schedule = None, valid_dl = None,\

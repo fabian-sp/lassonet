@@ -45,7 +45,7 @@ The LassoNet model becomes
 
 $$   
   \min_{\theta,\omega} L(\theta,\omega) + \lambda \|\theta\|_1 \\
-  \text{s.t.} \quad \|\gamma_j\|_\infty \leq M \|\theta_j\|_2. 
+  \text{s.t.} \quad \|\gamma_j\|_\infty \leq M \| \theta_j \|_2. 
 $$
 
 Note that if a filter output is useful as linear predictor for *some* class, then $\|\theta_j\|_2 \neq 0$ and thus the filter weights are allowed to be non-zero. 
@@ -55,8 +55,23 @@ Note that if a filter output is useful as linear predictor for *some* class, the
 
 We use the MNIST dataset to illustrate how Convolutional LassoNet works. We use a (more or less) standard architecture of two convolutional layers together with MaxPooling, Dropout and Linear layers at the end. We train the same architecture (with the same optimizer) *with and without* the LassoNet constraint (applied to the output of the first convolutional layer). Below is an overview of the architecture (without LassoNet):
 
-<img src="conv_architecture.png" alt="Network architecture" width="500"/>
+<img src="conv_architecture.png" alt="Network architecture" width="700"/>
 
+We set `M=20` and `lambda=4` which worked well but could be tuned of course. We first plot training and validation loss of the unconstrained model (denoted by *unc.*) and the one with LassoNet constraint. They are quite similar (so the additional constraint does not impede learning too much), and interestingely the LassoNet seems to have smaller loss during the first epochs.
+
+<img src="conv_loss.png" alt="Loss history" width="700"/>
+
+Next we show the learned filters of the first convolutional layer for the unconstrained model:
+
+<img src="conv_filter_unc.png" width="700"/>
+
+Compare this to the learned filters of the ConvLassoNet model:
+
+<img src="conv_filter.png" width="700"/>
+
+Clearly, adding the LassoNet constraint leads to filter sparsity but also to a shrinkage effect (similar as the standard Lasso). Finally, we look at the learned weights of the skip layer, now for the digit 8. These show us, for each filter, what the linear effect of the convolution output is with respect to the probability of the image showing the digit 8.
+
+<img src="conv_skip.png" width="700"/>
 
 ### Implementation details
 
@@ -68,7 +83,7 @@ Essentially, you only need the following additional code in your PyTorch model i
 self.skip = nn.Linear(self.out_channels*self.h_out*self.w_out, self.D_out)
 ```
 
-2) Adapt the `forward` method: we apply the skip layer and add the result to the result of the remaining nonlinear part at the end
+2) Adapt the `forward`-method: we apply the skip layer and add the result to the result of the remaining nonlinear part at the end.
 
 ```
 z1 = self.skip(out.reshape(-1, self.out_channels*self.h_out*self.w_out))
@@ -78,4 +93,6 @@ z1 = self.skip(out.reshape(-1, self.out_channels*self.h_out*self.w_out))
 
 ```
 def prox(self, lr):
+  ... # use the HIER-PROX of Proposition 1 in LassoNet-paper. 
+  return  
 ```
