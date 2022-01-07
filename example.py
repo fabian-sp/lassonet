@@ -6,6 +6,7 @@ from torch.utils.data import Dataset, DataLoader
 
 from module import LassoNet
 
+
 torch.manual_seed(42)
 np.random.seed(42)
 
@@ -15,8 +16,8 @@ D_in = 10 # input dimension
 D_out = 1 # output dimension
 H = 30 # hidden layer size
 
-N = 1000 # training samples
-batch_size = 15 
+N = 5000 # training samples
+batch_size = 32 
 
 def generate_toy_example(N):
     X = torch.randn(N, D_in)  
@@ -25,6 +26,7 @@ def generate_toy_example(N):
     return X, y.reshape(-1,1)
 
 X, Y = generate_toy_example(N)
+X_test, Y_test = generate_toy_example(4000)
 
 #%% Create DataLoader (see https://pytorch.org/tutorials/beginner/basics/data_tutorial.html)
 
@@ -43,6 +45,9 @@ class MyDataset(Dataset):
     
 ds = MyDataset(X,Y)
 dl = DataLoader(ds, batch_size = batch_size, shuffle = True)
+
+valid_ds = MyDataset(X_test,Y_test)
+valid_dl = DataLoader(valid_ds, batch_size = batch_size, shuffle = True)
 
 #%% Define non-linear part of LassoNet
 
@@ -71,7 +76,7 @@ class FeedForward(torch.nn.Module):
     
 #%% Initialize the model
 
-l1 = 3.
+l1 = 6.
 M = 1.
 
 G = FeedForward(D_in, D_out)
@@ -87,26 +92,29 @@ for param in model.parameters():
 #%% Training
 
 n_epochs = 100
-alpha0 = 1e-2 #initial step size/learning rate
+alpha0 = 1e-3 #initial step size/learning rate
 
 all_loss = list()
 
 #opt = torch.optim.Adam(model.parameters(), lr = alpha0)
 opt = torch.optim.SGD(model.parameters(), lr = alpha0, momentum = 0.9, nesterov = True)
-sched = StepLR(opt, step_size = 30, gamma = 0.5)
+sched = StepLR(opt, step_size = 20, gamma = 0.7)
 
 
-info = model.do_training(loss, dl, opt = opt, lr_schedule = sched, n_epochs = n_epochs, verbose = True)
+train_info = model.do_training(loss, dl, opt = opt, lr_schedule = sched, valid_dl = valid_dl, n_epochs = n_epochs, verbose = True)
 
 #%% Evaluation
 
 print("Skip layer weights: ", model.skip.weight.data)
 
-plt.figure()
-plt.plot(info['train_loss'])
+fig, ax = plt.subplots()
+ax.plot(train_info['train_loss'], c = '#002635', marker = 'o', label = 'Training loss')
+ax.plot(train_info['valid_loss'], c = '#002635', marker = 'x', ls = '--', label = 'Validation loss')
+ax.set_yscale('log')
 
-plt.figure()
-plt.imshow(G.W1.weight.data, cmap = "coolwarm", vmin = -.1, vmax = .1)
+fig, ax = plt.subplots()
+ax.imshow(G.W1.weight.data, cmap = "coolwarm", vmin = -.1, vmax = .1)
+#fig.savefig('plots/example_weights.png', dpi = 400)
 
 
 #%% Define HierNet

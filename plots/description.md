@@ -8,6 +8,8 @@ The LassoNet paper (Lemhadri et al., 2021) combines two fundamental ideas of sta
  and allowing a feature to participate in any hidden layer only if its skip-layer representative
  is active.
 
+## LassoNet problem
+
 I will briefly summarize the mathematical formulation (though looking into the paper provides all the details): let $x\in\mathbb{R}^n, y\in\mathbb{R}^m$ be input and output for a prediction/classification task. We have a neural network $g(x;\omega):\mathbb{R}^n \to \mathbb{R}^m$ where $\omega$ defines the parameters/weights and the linear (aka skip) layer $\theta \in\mathbb{R}^n$. The first layer of $g$ is a linear layer which weight matrix is denoted by $W^{(1)}$ (which is part of $\omega$). LassoNet is then given by
 
 $$   
@@ -19,9 +21,64 @@ where $\lambda$ and $M$ are given positive parameters. Note that the constraint 
 
 Importantly, learning the parameters of the network (i.e. the nonlinear model) and the feature selection is done simultaneously by solving the above optimization problem.
 
-## Implementation
+### Example
+
+Let's try out LassoNet on a small toy example. We create a dataset with the following true underlying model:
+
+```
+def generate_toy_example(N):
+    X = torch.randn(N, D_in)  
+    y = 2.*X[:, 3] - 1.*X[:, 3]**2 + 1.*X[:, 1] + 0.5*X[:, 2] + 2 * X[:, 4] * X[:, 5]
+
+    return X, y.reshape(-1,1)
+```
+
+We have `D_in = 10` input features: the coefficients `X1` and `X2` have a linear effect, `X3` has a linear and a squared effect, and `X4` and `X5` have a nonlinear (but no linear!) effect. Let's see what LassoNet makes out of this. We choose a simple feed-forward architecture:
+
+```
+class FeedForward(torch.nn.Module):
+    """
+    2-layer NN with RelU
+    """
+    def __init__(self, D_in, D_out):
+        super().__init__()
+        self.D_in = D_in
+        self.D_out = D_out
+        
+        self.W1 = torch.nn.Linear(D_in, H, bias = True)
+        self.relu = torch.nn.ReLU()
+        self.W2 = torch.nn.Linear(H, H)
+        self.W3 = torch.nn.Linear(H, D_out)
+        return
+    
+    def forward(self, x):
+        x = self.W1(x)
+        x = self.relu(x)
+        x = self.W2(x)
+        x = self.relu(x)
+        x = self.W3(x)
+        return x
+
+```
+
+We train the model and inspect the weights of the skip layer:
+
+```
+Skip layer weights:  tensor([[-5.6988e-04,  1.0155e-02,  4.7277e-03,  9.8471e-02,  8.1668e-02, 8.0918e-02,  9.6753e-06, -9.7709e-05,  1.1145e-04, -3.8136e-04]])
+
+```
+
+We see that the `X4` and `X5` feature (have in mind, its pythonic counting) learned a nonzero weight in the skip layer in order to be able to model the actual non-linear effect. We see that all true features are approximately detected. This is nicely viualized by plotting the weights of the first layer `W1`:
+
+<img src="example_weights.png" width="700"/>
+
+Of course, this is only the result for a handpicked(/-tuned) pair of `(lambda,M)`-values. But we can already see that LassoNet indeed works in the way it's intended.
+
+### Implementation
 
 The authors of the LassoNet paper also provide a PyTorch implementation of their model. Their code only covers networks with arbitrary linear hidden layers and ReLU activation functions, even though their model is quite flexible in terms of the network architecture (the only restriction is that the network needs a linear layer as first module). Thus, I implemented LassoNet (rather to learn more about PyTorch myself) for any network architecture (starting with a linear layer). The code can be found on [Github](https://github.com/fabian-sp/lassonet).
+
+
 
 ## Extending to convolutions
 
