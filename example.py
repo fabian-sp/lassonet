@@ -94,12 +94,9 @@ for param in model.parameters():
 n_epochs = 100
 alpha0 = 1e-3 #initial step size/learning rate
 
-all_loss = list()
-
 #opt = torch.optim.Adam(model.parameters(), lr = alpha0)
 opt = torch.optim.SGD(model.parameters(), lr = alpha0, momentum = 0.9, nesterov = True)
 sched = StepLR(opt, step_size = 20, gamma = 0.7)
-
 
 train_info = model.do_training(loss, dl, opt = opt, lr_schedule = sched, valid_dl = valid_dl, n_epochs = n_epochs, verbose = True)
 
@@ -111,6 +108,9 @@ fig, ax = plt.subplots()
 ax.plot(train_info['train_loss'], c = '#002635', marker = 'o', label = 'Training loss')
 ax.plot(train_info['valid_loss'], c = '#002635', marker = 'x', ls = '--', label = 'Validation loss')
 ax.set_yscale('log')
+ax.set_xlabel('Epoch')
+ax.set_ylabel('Loss')
+#fig.savefig('plots/example_loss.png', dpi = 400)
 
 fig, ax = plt.subplots()
 ax.imshow(G.W1.weight.data, cmap = "coolwarm", vmin = -.1, vmax = .1)

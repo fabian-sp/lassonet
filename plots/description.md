@@ -61,7 +61,31 @@ class FeedForward(torch.nn.Module):
 
 ```
 
+Now we create a LassoNet model by the following code (the full script for this example is [here](https://github.com/fabian-sp/lassonet/blob/main/example.py):
+
+```
+l1 = 6.
+M = 1.
+
+G = FeedForward(D_in, D_out)
+model = LassoNet(G, lambda_ = l1, M = M, skip_bias = True)
+
+loss = torch.nn.MSELoss(reduction='mean')
+```
+
 We train the model and inspect the weights of the skip layer:
+
+```
+n_epochs = 100
+alpha0 = 1e-3 #initial step size/learning rate
+
+opt = torch.optim.SGD(model.parameters(), lr = alpha0, momentum = 0.9, nesterov = True)
+sched = StepLR(opt, step_size = 20, gamma = 0.7)
+
+train_info = model.do_training(loss, dl, opt = opt, lr_schedule = sched, valid_dl = valid_dl, n_epochs = n_epochs, verbose = True)
+```
+
+<img src="example_loss.png" width="700"/>
 
 ```
 Skip layer weights:  tensor([[-5.6988e-04,  1.0155e-02,  4.7277e-03,  9.8471e-02,  8.1668e-02, 8.0918e-02,  9.6753e-06, -9.7709e-05,  1.1145e-04, -3.8136e-04]])
