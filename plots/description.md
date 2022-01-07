@@ -92,7 +92,9 @@ Skip layer weights:  tensor([[-5.6988e-04,  1.0155e-02,  4.7277e-03,  9.8471e-02
 
 ```
 
-We see that the `X4` and `X5` feature (have in mind, its pythonic counting) learned a nonzero weight in the skip layer in order to be able to model the actual non-linear effect. We see that all true features are approximately detected. This is nicely viualized by plotting the weights of the first layer `W1`:
+We see that the `X4` and `X5` feature (have in mind, its pythonic counting) learned a nonzero weight in the skip layer in order to be able to model the actual non-linear effect. We see that all true features are approximately detected. For `X1` and `X2`, we also have the correct sign of the linear effect. However, in general we can no expect that the skip layer weights converge to the true coefficients (even with infinitely many samples): the reason for this is that the model can learn as well through the non-linear part. 
+
+The feature selection is nicely viualized by plotting the weights of the first layer `W1`:
 
 <img src="example_weights.png" width="700"/>
 
