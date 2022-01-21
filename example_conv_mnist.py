@@ -91,7 +91,7 @@ ax.set_ylim(0,)
 ax.legend()
 fig.suptitle('Loss with and without LassoNet constraint')
 
-fig.savefig('plots/conv_loss.png', dpi = 400)
+#fig.savefig('plots/conv_loss.png', dpi = 400)
 ##013440
 ##D97925
 
@@ -117,7 +117,7 @@ p1 = mpatches.Patch(color='#002635', label='ConvLassoNet')
 p2 = mpatches.Patch(color='#AB1A25', label='Unconstrained')
 ax.legend(handles=[p1,p2])
 
-fig.savefig('plots/conv2_filter_norm.png', dpi = 400)
+#fig.savefig('plots/conv2_filter_norm.png', dpi = 400)
 
 #%% plot Conv1 filter weights
 
@@ -137,11 +137,11 @@ v_ = 0.5
 
 fig, axs = plt.subplots(4,4)
 plot_filter1(model, cmap=plt.cm.RdBu_r, vmin=-v_, vmax=v_)
-fig.savefig('plots/conv_filter.png', dpi = 400)
+#fig.savefig('plots/conv_filter.png', dpi = 400)
 
 fig, axs = plt.subplots(4,4)
 plot_filter1(model2, cmap=plt.cm.RdBu_r, vmin=-v_, vmax=v_)
-fig.savefig('plots/conv_filter_unc.png', dpi = 400)
+#fig.savefig('plots/conv_filter_unc.png', dpi = 400)
 
 #%% plot skip layer weights
 
@@ -164,4 +164,4 @@ v_ = 1e-3
 fig, axs = plt.subplots(4,4)
 fig.suptitle(f'Linear weights of convolution output for digit {label}')
 plot_skip(model, label, cmap = plt.cm.cividis, vmin = -v_, vmax = v_)
-fig.savefig(f'plots/conv_skip_{label}.png', dpi = 400)
+#fig.savefig(f'plots/conv_skip_{label}.png', dpi = 400)
