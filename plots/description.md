@@ -120,9 +120,9 @@ So far, the LassoNet constraint was applied directly to the input and is require
 
 ### Mathematical formulation
 
-So this is what we will do: we define a network having a convolutional layer in the beginning. We then apply the LassoNet constraint to the *output* of the convolutions. Mathematically, we write $\gamma_j$ for our $j=1,\dots,m$ filter weights (i.e. the number of output channels is $m$). In our example below, we use 5x5 filters, hence $\gamma_j \in \mathbb{R}^{5\times5}$.
+So this is what we will do: we define a network having two convolutional layers. We then apply the LassoNet constraint to the *output* of the first conv layer (`conv1`), which results in sparsity in the weights of the second conv layer (`conv2`). Mathematically, we write $\Gamma_j$ for the weight matrix of `conv2` corresponding to the $j=1,\dots,m$ output of `conv1`. In our example below, we use 5x5 filters and 16 output channels in `conv1`, hence $\Gamma_j \in \mathbb{R}^{16\times 5\times 5}$.
 
-The skip layer $\theta$ then can be split up into components $\theta_j$ for each of the filters. Each $\theta_j$ is a matrix of dimension `(output dimension of model)  x (output dimension of filter j)`. For the example below, we have 10 label classes, hence `output dimension of model = 10`, and the filters have output of size `28x28`, hence $\theta_j \in \mathbb{R}^{10\times 28^2}$.
+The skip layer $\theta$ then can be split up into components $\theta_j$ for each of the filters of `conv1`. Each $\theta_j$ is a matrix of dimension `(output dimension of model)  x (output dimension of filter j)`. For the example below, we have 10 label classes, hence `output dimension of model = 10`, and the filters have output of size `28x28`, hence $\theta_j \in \mathbb{R}^{10\times 28^2}$.
 
 The LassoNet model becomes
 
@@ -131,48 +131,54 @@ $$
   \text{s.t.} \quad \|\gamma_j\|_\infty \leq M \| \theta_j \|_2. 
 $$
 
-Note that if a filter output is useful as linear predictor for *some* class, then $\|\theta_j\|_2 \neq 0$ and thus the filter weights are allowed to be non-zero. 
+Note that if a filter output is useful as linear predictor for *some* class, then $\|\theta_j\|_2 \neq 0$ and thus the filter outputs are used for the `conv2` layer. All other filter outputs of `conv1` are essentially deactivated by the LassoNet constraint. 
 
 
 ### Example: convolutional LassoNet with MNIST
 
-We use the MNIST dataset to illustrate how Convolutional LassoNet works. We use a (more or less) standard architecture of two convolutional layers together with MaxPooling, Dropout and Linear layers at the end. We train the same architecture (with the same optimizer) *with and without* the LassoNet constraint (applied to the output of the first convolutional layer). Below is an overview of the architecture (without LassoNet):
+We use the MNIST dataset to illustrate how Convolutional LassoNet works. We use a (more or less) standard architecture of two convolutional layers together with MaxPooling, Dropout and Linear layers at the end. We train the same architecture (with the same optimizer) *with and without* the LassoNet constraint (applied to the output of the first convolutional layer). Below is an overview of the architecture:
 
 <img src="conv_architecture.png" alt="Network architecture" width="700"/>
 
-We set `M=20` and `lambda=4` which worked well but could be tuned of course. We first plot training and validation loss of the unconstrained model (denoted by *uncon.*) and the one with LassoNet constraint. They are quite similar (so the additional constraint does not impede learning too much), and interestingely the LassoNet seems to have smaller loss during the first epochs.
+We set `M=1` and `lambda=4`. We first plot training and validation loss of the unconstrained model and the one with LassoNet constraint. They are quite similar (so the additional constraint does not impede learning too much).
 
 <img src="conv_loss.png" alt="Loss history" width="700"/>
 
-Next we show the learned filters of the first convolutional layer for the unconstrained model:
+Let us look at the learned weights of the skip layer, now for the digit 8. These show us, for each filter of `conv1`, what the linear effect of the convolution output is with respect to the probability of the image showing the digit 8.
+
+<img src="conv_skip_8.png" width="700"/>
+
+We now plot the max-norm of each filter of `conv2`, sorted by input channel. We can see nicely that only four input channels are essentially used.
+
+<img src="conv2_filter_norm.png" width="700"/>
+
+Next we show the learned filters of the **first** convolutional layer for the **unconstrained** model:
 
 <img src="conv_filter_unc.png" width="700"/>
 
-Compare this to the learned filters of the ConvLassoNet model:
+Compare this to the learned filters of the **ConvLassoNet** model (order might not be the same):
 
 <img src="conv_filter.png" width="700"/>
 
-Clearly, adding the LassoNet constraint leads to filter sparsity but also to a shrinkage effect (similar as the standard Lasso). Finally, we look at the learned weights of the skip layer, now for the digit 8. These show us, for each filter, what the linear effect of the convolution output is with respect to the probability of the image showing the digit 8.
-
-<img src="conv_skip_8.png" width="700"/>
+Due to LassoNet, we now only need to look at the filters which are actually used in `conv2` and which are 1,3,7,15.
 
 ### Implementation details
 
 Essentially, you only need the following additional code in your PyTorch model in order to use LassoNet:
 
-1) Define a skip layer: we map linearly from the output of the convolutions to the output. Note that the output of the convolutions has dimension `out_channels*h_out*w_out` where `h_out, w_out` depend on the hyperparameters of the convolutional kernels.
+1) Define a skip layer: we map linearly from the output of the convolutions to the output. Note that the output of the convolutions has dimension `out_channels1*h_out*w_out` where `h_out, w_out` depend on the hyperparameters of the convolutional kernels of `conv1`.
 
 ```
-self.skip = nn.Linear(self.out_channels*self.h_out*self.w_out, self.D_out)
+self.skip = nn.Linear(self.out_channels1*self.h_out*self.w_out, self.D_out)
 ```
 
 2) Adapt the `forward`-method: we apply the skip layer and add the result to the result of the remaining nonlinear part at the end.
 
 ```
-z1 = self.skip(out.reshape(-1, self.out_channels*self.h_out*self.w_out))
+z1 = self.skip(out.reshape(-1, self.out_channels1*self.h_out*self.w_out))
 ```
 
-3) Defining a prox method which is executed after `.step()` in the training process. This changes the weights of the convolutional filters and the skip layer inplace. All other parameters are unchanged.
+3) Defining a prox method which is executed after `.step()` in the training process. This changes the weights of the filters of `conv2` and the skip layer inplace. All other parameters are unchanged.
 
 ```
 def prox(self, lr):
