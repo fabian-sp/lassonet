@@ -35,7 +35,7 @@ def conv_output_shape(h_w, kernel_size=1, stride=1, pad=0, dilation=1):
     return h, w
 
 class ConvLassoNet(nn.Module):
-    def __init__(self, lambda_ = 1., M = 1., D_in = (28,28), D_out = 10, kernel_size=5, stride=1, padding=2, dilation=1):
+    def __init__(self, lambda_ = 1., M = 1., D_in = (28,28), D_out = 10, out_channels1 = 16, out_channels2 = 32, stride=1, padding=2, dilation=1):
         """
         LassoNet applied after a first layer of convolutions. See https://jmlr.org/papers/volume22/20-848/20-848.pdf for details.
 
@@ -66,40 +66,38 @@ class ConvLassoNet(nn.Module):
         assert (self.lambda_ is None) or (self.lambda_ > 0), "lambda_ must be None or positive"
         assert self.M > 0, "M needs to be positive (possibly np.inf)"
         
-        # hyperparameters
-        self.kernel_size = 5
-        self.out_channels = 32
+        # hyperparameters (works as long as input size can be divided by 4)
+        self.kernel_size1 = 5
+        self.kernel_size2 = 5
+        self.out_channels1 = out_channels1
+        self.out_channels2 = out_channels2
         
         self.D_in = D_in
         self.D_out = D_out
-        self.conv1_output_dim(kernel_size, stride, padding, dilation)
+        self.conv1_output_dim(stride, padding, dilation)
         
         # first conv layer and skip layer
-        self.conv1 = nn.Conv2d(1, self.out_channels, kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation)
+        # input pixels nxn, filter size fxf, padding p: output size (n + 2p — f + 1)
+        self.conv1 = nn.Conv2d(1, self.out_channels1, kernel_size=self.kernel_size1, stride=stride, padding=padding, dilation=dilation)
         
         if self.lambda_ is not None:
-            self.skip = nn.Linear(self.out_channels*self.h_out*self.w_out, self.D_out)
+            self.skip = nn.Linear(self.out_channels1*self.h_out*self.w_out, self.D_out)
         
         # remaining nonlinear part (after conv1)
         self.relu = nn.ReLU()
         self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.layer2 = nn.Sequential(
-                        nn.Conv2d(32, 64, kernel_size=5, stride=1, padding=2),
-                        nn.ReLU(),
-                        nn.MaxPool2d(kernel_size=2, stride=2))
-        
+        self.conv2 = nn.Conv2d(self.out_channels1, self.out_channels2, kernel_size=self.kernel_size2, stride=1, padding=2)
         self.drop_out = nn.Dropout()
         # downsampling twice by factor 2 --> 7x7 output, 64 channels
-        self.fc1 = nn.Linear(7*7*64, 1000)
-        self.fc2 = nn.Linear(1000, self.D_out)
+        self.fc1 = nn.Linear(int((self.D_in[0]*self.D_in[1])/(4*4)) *self.out_channels2, 200)
+        self.fc2 = nn.Linear(200, self.D_out)
         
         return
     
-    def conv1_output_dim(self, kernel_size, stride, padding, dilation):
-        """ computes output diimension of conv1; needed for dimensionality of skip layer
+    def conv1_output_dim(self, stride, padding, dilation):
+        """ computes output dimension of conv1; needed for dimensionality of skip layer
         """
-        self.kernel_size = kernel_size        
-        self.h_out, self.w_out = conv_output_shape(self.D_in, kernel_size, stride, padding, dilation)
+        self.h_out, self.w_out = conv_output_shape(self.D_in, self.kernel_size1, stride, padding, dilation)
         
         return
         
@@ -107,14 +105,16 @@ class ConvLassoNet(nn.Module):
         out = self.conv1(x)
         
         if self.lambda_ is not None:
-            z1 = self.skip(out.reshape(-1, self.out_channels*self.h_out*self.w_out))
+            z1 = self.skip(out.reshape(-1, self.out_channels1*self.h_out*self.w_out))
         else: 
             z1 = 0.
             
-        # rest of non-linear part: can be adapted freely
+        # rest of non-linear part
         out = self.relu(out)
         out = self.maxpool(out)
-        out = self.layer2(out)
+        out = self.conv2(out)
+        out = self.relu(out)
+        out = self.maxpool(out)
         out = out.reshape(out.size(0), -1)
         out = self.drop_out(out)
         out = self.fc1(out)
@@ -123,14 +123,14 @@ class ConvLassoNet(nn.Module):
     
     def prox(self, lr):
         # loop through output channels / filters
-        for j in range(self.out_channels):
+        for j in range(self.out_channels1):
             theta_j = self.skip.weight.data[:,self.h_out*self.w_out*j:self.h_out*self.w_out*(j+1)].reshape(-1)
-            filter_j = self.conv1.weight[j,0,:,:].reshape(-1)
+            filter_j = self.conv2.weight[:,j,:,:].reshape(-1)
             
             theta_j, filter_j = hier_prox(theta_j, filter_j, lambda_=self.lambda_*lr, lambda_bar=0, M = self.M)
             
             self.skip.weight.data[:,self.h_out*self.w_out*j:self.h_out*self.w_out*(j+1)] = theta_j.reshape(self.D_out, -1)
-            self.conv1.weight.data[j,0,:,:] = filter_j.reshape(self.kernel_size, self.kernel_size) 
+            self.conv2.weight.data[:,j,:,:] = filter_j.reshape(self.out_channels2, self.kernel_size2, self.kernel_size2) 
         return
     
     def do_training(self, loss, dl, opt = None, n_epochs = 10, lr_schedule = None, valid_dl = None,\

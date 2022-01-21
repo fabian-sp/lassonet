@@ -35,8 +35,8 @@ images, labels = dataiter.next()
 
 
 #%% the actual model
-l1 = 4.
-M = 20.
+l1 = 5.
+M = 10.
 
 model = ConvLassoNet(lambda_ = l1, M = M, D_in = (28,28), D_out = 10)
 
@@ -48,7 +48,7 @@ for param in model.parameters():
     print(param.size())
 
 #%%
-n_epochs = 10
+n_epochs = 5
 loss = torch.nn.CrossEntropyLoss()
 
 alpha0 = 0.01
@@ -98,11 +98,11 @@ fig.suptitle('Loss with and without LassoNet constraint')
 
 def plot_filter(model, cmap = plt.cm.cividis, vmin = None, vmax = None):
     
-    conv_filter = model.conv1.weight.data
+    conv_filter = model.conv2.weight.data
     
-    for j in np.arange(conv_filter.size(0)):
+    for j in np.arange(conv_filter.size(1)):
         ax = axs.ravel()[j]
-        ax.imshow(conv_filter[j,0,:,:], cmap = cmap, vmin = vmin, vmax = vmax)
+        ax.imshow(conv_filter[:,j,:,:].mean(axis=0), cmap = cmap, vmin = vmin, vmax = vmax) 
         ax.axis('off')
         ax.set_title(f'filter {j}', fontsize = 8)
 
@@ -110,11 +110,11 @@ def plot_filter(model, cmap = plt.cm.cividis, vmin = None, vmax = None):
 
 v_ = 0.4
 
-fig, axs = plt.subplots(4,8)
+fig, axs = plt.subplots(4,4)
 plot_filter(model, cmap=plt.cm.RdBu, vmin=-v_, vmax=v_)
 #fig.savefig('plots/conv_filter.png', dpi = 400)
 
-fig, axs = plt.subplots(4,8)
+fig, axs = plt.subplots(4,4)
 plot_filter(model2, cmap=plt.cm.RdBu, vmin=-v_, vmax=v_)
 #fig.savefig('plots/conv_filter_unc.png', dpi = 400)
 
@@ -125,7 +125,7 @@ def plot_skip(model, label, cmap = plt.cm.cividis, vmin = None, vmax = None):
     skip_weight = model.skip.weight.data.numpy().copy()
     T = skip_weight[label,:]
         
-    for j in np.arange(model.out_channels):
+    for j in np.arange(model.out_channels1):
         ax = axs.ravel()[j]
         ax.imshow(T[model.h_out*model.w_out*j:model.h_out*model.w_out*(j+1)].reshape(model.h_out,model.w_out),\
                   cmap = cmap, vmin = vmin, vmax = vmax)
@@ -136,7 +136,7 @@ def plot_skip(model, label, cmap = plt.cm.cividis, vmin = None, vmax = None):
 
 label = 8
 
-fig, axs = plt.subplots(4,8)
+fig, axs = plt.subplots(4,4)
 fig.suptitle(f'Linear weights of convolution output for digit {label}')
 plot_skip(model, label, cmap = plt.cm.cividis, vmin = -2e-4, vmax = 2e-4)
 #fig.savefig(f'plots/conv_skip_{label}.png', dpi = 400)
