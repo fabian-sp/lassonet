@@ -4,6 +4,7 @@ adapted from this tutorial: https://github.com/ozx1812/MNIST-PyTorch/blob/master
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import torch
 from torch.optim.lr_scheduler import StepLR
 
@@ -35,8 +36,8 @@ images, labels = dataiter.next()
 
 
 #%% the actual model
-l1 = 5.
-M = 10.
+l1 = 4.
+M = 1.
 
 model = ConvLassoNet(lambda_ = l1, M = M, D_in = (28,28), D_out = 10)
 
@@ -48,7 +49,7 @@ for param in model.parameters():
     print(param.size())
 
 #%%
-n_epochs = 5
+n_epochs = 10
 loss = torch.nn.CrossEntropyLoss()
 
 alpha0 = 0.01
@@ -79,47 +80,70 @@ train_info2 = model2.do_training(loss, train_loader, opt = opt2, n_epochs = n_ep
 #     print(param.data)
 
 fig, ax = plt.subplots()
-ax.plot(train_info['train_loss'], c = '#002635', marker = 'o', label = 'Training loss')
-ax.plot(train_info['valid_loss'], c = '#002635', marker = 'x', ls = '--', label = 'Validation loss')
+ax.plot(train_info['train_loss'], c = '#002635', marker = 'o', label = 'Train loss ConvLassoNet')
+ax.plot(train_info['valid_loss'], c = '#002635', marker = 'x', ls = '--', label = 'Validation loss ConvLassoNet')
 
-ax.plot(train_info2['train_loss'], c = '#AB1A25', marker = 'o', label = 'Training loss (uncon.)')
-ax.plot(train_info2['valid_loss'], c = '#AB1A25', marker = 'x', ls = '--', label = 'Validation loss (uncon.)')
+ax.plot(train_info2['train_loss'], c = '#AB1A25', marker = 'o', label = 'Train loss Unconstrained')
+ax.plot(train_info2['valid_loss'], c = '#AB1A25', marker = 'x', ls = '--', label = 'Validation loss Unconstrained')
 
 ax.set_xlabel('Epoch')
 ax.set_ylim(0,)
 ax.legend()
 fig.suptitle('Loss with and without LassoNet constraint')
 
-#fig.savefig('plots/conv_loss.png', dpi = 400)
+fig.savefig('plots/conv_loss.png', dpi = 400)
 ##013440
 ##D97925
 
-#%% plot Conv filter weights
+#%% plot Conv2 filter norm
 
-def plot_filter(model, cmap = plt.cm.cividis, vmin = None, vmax = None):
+def plot_filter_norm(mod, ax, color):
     
-    conv_filter = model.conv2.weight.data
+    X = mod.conv2.weight.data.numpy()
+    infnorm_ = np.linalg.norm(X, axis = (2,3)).T
+    ax.plot(infnorm_, lw = 0.5, alpha = 0.2, c = color, marker = 'o')    
+
+    return 
+
+fig, ax = plt.subplots()
+plot_filter_norm(model, ax, color = '#002635')
+plot_filter_norm(model2, ax, color = '#AB1A25')
+
+ax.set_ylabel('Max-norm of each filter channel')
+ax.set_xlabel('Conv1 output channel')
+ax.set_ylim(0,)
+
+p1 = mpatches.Patch(color='#002635', label='ConvLassoNet')
+p2 = mpatches.Patch(color='#AB1A25', label='Unconstrained')
+ax.legend(handles=[p1,p2])
+
+fig.savefig('plots/conv2_filter_norm.png', dpi = 400)
+
+#%% plot Conv1 filter weights
+
+def plot_filter1(model, cmap = plt.cm.cividis, vmin = None, vmax = None):
     
-    for j in np.arange(conv_filter.size(1)):
+    conv_filter = model.conv1.weight.data
+    
+    for j in np.arange(conv_filter.size(0)):
         ax = axs.ravel()[j]
-        ax.imshow(conv_filter[:,j,:,:].mean(axis=0), cmap = cmap, vmin = vmin, vmax = vmax) 
+        ax.imshow(conv_filter[j,0,:,:], cmap = cmap, vmin = vmin, vmax = vmax) 
         ax.axis('off')
         ax.set_title(f'filter {j}', fontsize = 8)
 
     return 
 
-v_ = 0.4
+v_ = 0.5
 
 fig, axs = plt.subplots(4,4)
-plot_filter(model, cmap=plt.cm.RdBu, vmin=-v_, vmax=v_)
-#fig.savefig('plots/conv_filter.png', dpi = 400)
+plot_filter1(model, cmap=plt.cm.RdBu_r, vmin=-v_, vmax=v_)
+fig.savefig('plots/conv_filter.png', dpi = 400)
 
 fig, axs = plt.subplots(4,4)
-plot_filter(model2, cmap=plt.cm.RdBu, vmin=-v_, vmax=v_)
-#fig.savefig('plots/conv_filter_unc.png', dpi = 400)
+plot_filter1(model2, cmap=plt.cm.RdBu_r, vmin=-v_, vmax=v_)
+fig.savefig('plots/conv_filter_unc.png', dpi = 400)
 
 #%% plot skip layer weights
-
 
 def plot_skip(model, label, cmap = plt.cm.cividis, vmin = None, vmax = None):
     skip_weight = model.skip.weight.data.numpy().copy()
@@ -135,8 +159,9 @@ def plot_skip(model, label, cmap = plt.cm.cividis, vmin = None, vmax = None):
     return
 
 label = 8
+v_ = 1e-3
 
 fig, axs = plt.subplots(4,4)
 fig.suptitle(f'Linear weights of convolution output for digit {label}')
-plot_skip(model, label, cmap = plt.cm.cividis, vmin = -2e-4, vmax = 2e-4)
-#fig.savefig(f'plots/conv_skip_{label}.png', dpi = 400)
+plot_skip(model, label, cmap = plt.cm.cividis, vmin = -v_, vmax = v_)
+fig.savefig(f'plots/conv_skip_{label}.png', dpi = 400)
