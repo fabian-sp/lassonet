@@ -120,7 +120,7 @@ So far, the LassoNet constraint was applied directly to the input and is require
 
 ### Mathematical formulation
 
-So this is what we will do: we define a network having two convolutional layers. We then apply the LassoNet constraint to the *output* of the first conv layer (`conv1`), which results in sparsity in the weights of the second conv layer (`conv2`). Mathematically, we write $\Gamma_j$ for the weight matrix of `conv2` corresponding to the $j=1,\dots,m$ output of `conv1`. In our example below, we use 5x5 filters and 16 output channels in `conv1`, hence $\Gamma_j \in \mathbb{R}^{16\times 5\times 5}$.
+So this is what we will do: we define a network having two convolutional layers. We then apply the LassoNet constraint to the *output* of the first conv layer (`conv1`), which results in sparsity in the weights of the second conv layer (`conv2`). Mathematically, we write $\Gamma_j$ for the weight matrix of `conv2` corresponding to the $j=1,\dots,m$ output of `conv1`. In our example below, we use 5x5 filters, 16 input and 32 output channels in `conv1`, hence $\Gamma_j \in \mathbb{R}^{32\times 16\times 5\times 5}$.
 
 The skip layer $\theta$ then can be split up into components $\theta_j$ for each of the filters of `conv1`. Each $\theta_j$ is a matrix of dimension `(output dimension of model)  x (output dimension of filter j)`. For the example below, we have 10 label classes, hence `output dimension of model = 10`, and the filters have output of size `28x28`, hence $\theta_j \in \mathbb{R}^{10\times 28^2}$.
 
