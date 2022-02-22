@@ -78,7 +78,7 @@ for param in model.parameters():
 
 #%% Training
 
-n_epochs = 2
+n_epochs = 5
 alpha0 = 1e-2 #initial step size/learning rate
 
 prep = lambda x: x.reshape(-1,28*28)
@@ -115,7 +115,7 @@ for j in range(n_epochs):
     loss_hist['valid_acc'].append(valid_acc/len(test_loader))
              
     print(f"\t  train loss: {np.mean(epoch_info['train_loss'])}.")
-    print(f"\t  validation loss: {valid_loss}.")    
+    print(f"\t  validation loss: {valid_loss/len(test_loader)}.")    
 
 #%% evaluation
 

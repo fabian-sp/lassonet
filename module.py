@@ -154,7 +154,6 @@ class LassoNet(torch.nn.Module):
             info['train_loss'].append(loss_val.item())
             info['train_acc'].append(accuracy)
             
-            
-            
+                    
         return info
     

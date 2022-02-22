@@ -58,21 +58,47 @@ alpha0 = 0.01
 #%% training
 
 opt = torch.optim.SGD(model.parameters(), lr = alpha0, momentum = 0.9, nesterov = True)
-sched = StepLR(opt, step_size=1, gamma=0.5)
+lr_schedule = StepLR(opt, step_size=1, gamma=0.5)
 
-train_info = model.do_training(loss, train_loader, opt=opt, n_epochs=n_epochs, lr_schedule=None, valid_ds=test_data,\
-                               verbose=True)
+loss_hist = {'train_loss':[], 'valid_loss':[], 'train_acc':[], 'valid_acc':[]}
+
+for j in range(n_epochs): 
+    print(f"================== Epoch {j+1}/{n_epochs} ================== ")
+    print(opt)  
+    
+    ### TRAINING
+    epoch_info = model.train_epoch(loss, train_loader, opt=opt)
+    loss_hist['train_loss'].append(np.mean(epoch_info['train_loss']))
+    loss_hist['train_acc'].append(np.mean(epoch_info['train_acc']))
+    
+    if lr_schedule is not None:
+        lr_schedule.step()
+    
+    ### VALIDATION
+    valid_loss = 0; valid_acc = 0;
+    model.eval()
+    for inputs, targets in test_loader:
+        output = model.forward(inputs)          
+        valid_loss += loss(output, targets).item()
+        _, predictions = torch.max(output.data, 1)
+        valid_acc += (predictions == targets).float().mean().item()
+    
+    loss_hist['valid_loss'].append(valid_loss/len(test_loader))
+    loss_hist['valid_acc'].append(valid_acc/len(test_loader))
+             
+    print(f"\t  train loss: {np.mean(epoch_info['train_loss'])}.")
+    print(f"\t  validation loss: {valid_loss/len(test_loader)}.")    
 
 
 #%% training of model without penalty
 
-model2 = ConvLassoNet(lambda_ = None, M = 1., D_in = (28,28), D_out = 10)
+# model2 = ConvLassoNet(lambda_ = None, M = 1., D_in = (28,28), D_out = 10)
 
-opt2 = torch.optim.SGD(model2.parameters(), lr = alpha0, momentum = 0.9, nesterov = True)
-sched2 = StepLR(opt2, step_size=1, gamma=0.5)
+# opt2 = torch.optim.SGD(model2.parameters(), lr = alpha0, momentum = 0.9, nesterov = True)
+# sched2 = StepLR(opt2, step_size=1, gamma=0.5)
 
-train_info2 = model2.do_training(loss, train_loader, opt=opt2, n_epochs=n_epochs, lr_schedule=None, valid_ds=test_data,\
-                                 verbose=True)
+# train_info2 = model2.do_training(loss, train_loader, opt=opt2, n_epochs=n_epochs, lr_schedule=None, valid_ds=test_data,\
+#                                  verbose=True)
 
 
 #%%    
