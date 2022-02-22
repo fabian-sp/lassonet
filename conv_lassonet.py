@@ -137,7 +137,7 @@ class ConvLassoNet(nn.Module):
     
 
     def do_training(self, loss: torch.nn.Module, dl: DataLoader, opt: torch.optim.Optimizer=None, n_epochs: int=10, lr_schedule: torch.optim.lr_scheduler.StepLR=None,\
-                    valid_ds: Dataset=None, preprocess: Callable=None, verbose: bool=True):
+                    valid_ds: Dataset=None, verbose: bool=True):
         """
 
         Parameters
@@ -154,8 +154,6 @@ class ConvLassoNet(nn.Module):
             Learning rate schedule. Step is taken after each epoch. The default is None.
         valid_ds : ``torch.utils.data.Dataset``, optional
             Dataset for validation loss. The default is None.
-        preprocess : function, optional
-            A function for preprocessing the inputs for the model. The default is None.
         verbose : boolean, optional
             Verbosity. The default is True.
 
@@ -178,13 +176,10 @@ class ConvLassoNet(nn.Module):
             
             ################### SETUP FOR EPOCH ##################
             all_loss = list(); all_acc = list()
-            all_vl_loss = list(); all_vl_acc = list()
             
             ################### START OF EPOCH ###################
             self.train()
             for inputs, targets in dl:
-                if preprocess is not None:
-                    inputs = preprocess(inputs)
                 
                 # forward pass
                 y_pred = self.forward(inputs)
@@ -213,27 +208,28 @@ class ConvLassoNet(nn.Module):
             if lr_schedule is not None:
                 lr_schedule.step()    
             
-            ### VALIDATION
-            # if valid_ds is not None:
-            #     self.eval()
-            #     output = self.forward(valid_ds.X)
-            #     v_loss = loss(output, v_targets)
-            #     v_scores, v_predictions = torch.max(output.data, 1)
-            #     v_correct = (v_predictions == v_targets).float().mean()
+            ## VALIDATION
+            if valid_ds is not None:
+                self.eval()
+                output = self.forward(valid_ds.data)
+                this_valid_loss = loss(output, valid_ds.targets).item()
+                v_scores, v_predictions = torch.max(output.data, 1)
+                this_valid_acc = (v_predictions == valid_ds.targets).float().mean().item()
                 
-            #     all_vl_loss.append(v_loss.item())
-            #     all_vl_acc.append(v_correct.item())
         
             ### STORE
             
             info['train_loss'].append(np.mean(all_loss))
             info['train_acc'].append(np.mean(all_acc))
-            # if valid_ds is not None:
-            #     info['valid_loss'].append()
-            #     info['valid_acc'].append()
+            if valid_ds is not None:
+                info['valid_loss'].append(this_valid_loss)
+                info['valid_acc'].append(this_valid_acc)
             
             if verbose:
-                print(f"Epoch {j+1}/{n_epochs}: \t  train loss: {np.mean(all_loss)}, \t train accuracy: {np.mean(all_acc)}.")
+                print(f"================== Epoch {j+1}/{n_epochs} ================== ")
+                print(f"\t  train loss: {np.mean(all_loss)}.")
+                if valid_ds is not None:
+                    print(f"\t  validation loss: {this_valid_loss}.")    
                 print(opt)    
             
         return info

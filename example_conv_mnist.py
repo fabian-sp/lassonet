@@ -29,11 +29,12 @@ test_data = datasets.MNIST(root='data', train=False,
 train_loader = torch.utils.data.DataLoader(train_data, batch_size = batch_size, num_workers=0)
 test_loader = torch.utils.data.DataLoader(test_data, batch_size = 512, num_workers=0)
 
+# need channels dimension in test set
+test_data.data = test_data.data.reshape(-1,1,28,28)
 
 # obtain one batch of training images
-dataiter = iter(train_loader)
+dataiter = iter(test_loader)
 images, labels = dataiter.next()
-
 
 #%% the actual model
 l1 = 4.
@@ -59,8 +60,8 @@ alpha0 = 0.01
 opt = torch.optim.SGD(model.parameters(), lr = alpha0, momentum = 0.9, nesterov = True)
 sched = StepLR(opt, step_size=1, gamma=0.5)
 
-train_info = model.do_training(loss, train_loader, opt = opt, n_epochs = n_epochs, lr_schedule = None, valid_dl = test_loader,\
-                               verbose = True)
+train_info = model.do_training(loss, train_loader, opt=opt, n_epochs=n_epochs, lr_schedule=None, valid_ds=test_data,\
+                               verbose=True)
 
 
 #%% training of model without penalty
@@ -70,8 +71,8 @@ model2 = ConvLassoNet(lambda_ = None, M = 1., D_in = (28,28), D_out = 10)
 opt2 = torch.optim.SGD(model2.parameters(), lr = alpha0, momentum = 0.9, nesterov = True)
 sched2 = StepLR(opt2, step_size=1, gamma=0.5)
 
-train_info2 = model2.do_training(loss, train_loader, opt = opt2, n_epochs = n_epochs, lr_schedule = None, valid_dl = test_loader,\
-                                 verbose = True)
+train_info2 = model2.do_training(loss, train_loader, opt=opt2, n_epochs=n_epochs, lr_schedule=None, valid_ds=test_data,\
+                                 verbose=True)
 
 
 #%%    

@@ -146,8 +146,8 @@ class LassoNet(torch.nn.Module):
             ################### START OF EPOCH ###################
             self.train()
             for inputs, targets in dl:
-                if preprocess is not None:
-                    inputs = preprocess(inputs)
+                #if preprocess is not None:
+                #    inputs = preprocess(inputs)
                 
                 # forward pass
                 y_pred = self.forward(inputs)
@@ -178,10 +178,11 @@ class LassoNet(torch.nn.Module):
             ### VALIDATION
             if valid_ds is not None:
                 self.eval()
-                output = self.forward(valid_ds.X)
-                this_vl_loss = loss(output, valid_ds.Y).item()
+                               
+                output = self.forward(valid_ds.data)
+                this_vl_loss = loss(output, valid_ds.targets).item()
                 v_scores, v_predictions = torch.max(output.data, 1)
-                this_vl_acc = (v_predictions == valid_ds.Y).float().mean().item()
+                this_vl_acc = (v_predictions == valid_ds.targets).float().mean().item()
                 
                 
             ### STORE
@@ -193,9 +194,10 @@ class LassoNet(torch.nn.Module):
                 info['valid_acc'].append(this_vl_acc)
             
             if verbose:
-                print(f"Epoch {j+1}/{n_epochs}: \t  train loss: {np.mean(all_loss)}.")
+                print(f"================== Epoch {j+1}/{n_epochs} ================== ")
+                print(f"\t  train loss: {np.mean(all_loss)}.")
                 if valid_ds is not None:
-                    print(f"Epoch {j+1}/{n_epochs}: \t  validation loss: {this_vl_loss}.")    
+                    print(f"\t  validation loss: {this_vl_loss}.")    
                 print(opt)    
             
         return info

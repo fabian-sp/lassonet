@@ -31,16 +31,16 @@ X_test, Y_test = generate_toy_example(4000)
 #%% Create DataLoader (see https://pytorch.org/tutorials/beginner/basics/data_tutorial.html)
 
 class MyDataset(Dataset):
-    def __init__(self, X, Y):
-        self.X = X
-        self.Y = Y
+    def __init__(self, data, targets):
+        self.data = data
+        self.targets = targets
 
     def __len__(self):
-        return len(self.Y)
+        return len(self.targets)
 
     def __getitem__(self, idx):
-        x = self.X[idx, :]
-        y = self.Y[idx]
+        x = self.data[idx, :]
+        y = self.targets[idx]
         return x, y
     
 ds = MyDataset(X,Y)
@@ -90,7 +90,7 @@ for param in model.parameters():
 
 #%% Training
 
-n_epochs = 100
+n_epochs = 80
 alpha0 = 1e-3 #initial step size/learning rate
 
 #opt = torch.optim.Adam(model.parameters(), lr = alpha0)
