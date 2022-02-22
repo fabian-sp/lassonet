@@ -111,6 +111,7 @@ for j in np.arange(n_epochs):
         lr_schedule.step()
     
     ### VALIDATION
+    model.eval()
     output = model.forward(valid_ds.data)          
     valid_loss = loss(output, valid_ds.targets).item()
     loss_hist['valid_loss'].append(valid_loss)

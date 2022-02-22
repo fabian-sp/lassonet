@@ -1,6 +1,6 @@
 """
-"""
 
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
@@ -75,30 +75,56 @@ model.forward(images.view(-1,28*28))
 for param in model.parameters():
     print(param.size())
     
-#%% training
 
-alpha0 = 1e-2
+#%% Training
 
-#opt = torch.optim.Adam(model.parameters(), lr=alpha0)
-opt = torch.optim.SGD(model.parameters(), lr = alpha0, momentum = 0.9, nesterov = True)
-
-sched = StepLR(opt, step_size=1, gamma=0.5)
+n_epochs = 2
+alpha0 = 1e-2 #initial step size/learning rate
 
 prep = lambda x: x.reshape(-1,28*28)
 
-# TODO: add validation set
-info = model.do_training(loss, train_loader, opt=opt, lr_schedule=sched, n_epochs=5,\
-                             preprocess=prep, verbose=True)
+#opt = torch.optim.Adam(model.parameters(), lr = alpha0)
+opt = torch.optim.SGD(model.parameters(), lr = alpha0, momentum = 0.9, nesterov = True)
+lr_schedule = StepLR(opt, step_size = 1, gamma = 0.5)
 
-# for param in model.parameters():
-#     print(param.data)
 
-print("Skip layer weights: ", model.skip.weight.data)
+loss_hist = {'train_loss':[], 'valid_loss':[], 'train_acc':[], 'valid_acc':[]}
+
+for j in range(n_epochs): 
+    print(f"================== Epoch {j+1}/{n_epochs} ================== ")
+    print(opt)  
+    
+    ### TRAINING
+    epoch_info = model.train_epoch(loss, train_loader, opt=opt, preprocess=prep)
+    loss_hist['train_loss'].append(np.mean(epoch_info['train_loss']))
+    loss_hist['train_acc'].append(np.mean(epoch_info['train_acc']))
+    
+    if lr_schedule is not None:
+        lr_schedule.step()
+    
+    ### VALIDATION
+    valid_loss = 0; valid_acc = 0;
+    model.eval()
+    for inputs, targets in test_loader:
+        output = model.forward(prep(inputs))          
+        valid_loss += loss(output, targets).item()
+        _, predictions = torch.max(output.data, 1)
+        valid_acc += (predictions == targets).float().mean().item()
+    
+    loss_hist['valid_loss'].append(valid_loss/len(test_loader))
+    loss_hist['valid_acc'].append(valid_acc/len(test_loader))
+             
+    print(f"\t  train loss: {np.mean(epoch_info['train_loss'])}.")
+    print(f"\t  validation loss: {valid_loss}.")    
 
 #%% evaluation
 
-plt.figure()
-plt.plot(info['train_loss'])
+fig, ax = plt.subplots()
+ax.plot(loss_hist['train_loss'], c = '#002635', marker = 'o', label = 'Training loss')
+ax.plot(loss_hist['valid_loss'], c = '#002635', marker = 'x', ls = '--', label = 'Validation loss')
+ax.set_yscale('log')
+ax.set_xlabel('Epoch')
+ax.set_ylabel('Loss')
 
 plt.figure()
 plt.imshow(G.W1.weight.data, cmap = "coolwarm")
