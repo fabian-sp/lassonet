@@ -86,8 +86,9 @@ sched = StepLR(opt, step_size=1, gamma=0.5)
 
 prep = lambda x: x.reshape(-1,28*28)
 
-info = model.do_training(loss, train_loader, opt = opt, lr_schedule = sched, n_epochs = 5,\
-                             preprocess = prep, verbose = True)
+# TODO: add validation set
+info = model.do_training(loss, train_loader, opt=opt, lr_schedule=sched, n_epochs=5,\
+                             preprocess=prep, verbose=True)
 
 # for param in model.parameters():
 #     print(param.data)

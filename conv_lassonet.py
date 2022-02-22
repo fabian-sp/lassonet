@@ -7,6 +7,8 @@ some snippets from: https://medium.com/dataseries/visualizing-the-feature-maps-a
 import numpy as np
 import torch
 import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader
+from typing import Callable
 
 from module import hier_prox
 
@@ -133,13 +135,14 @@ class ConvLassoNet(nn.Module):
             self.conv2.weight.data[:,j,:,:] = filter_j.reshape(self.out_channels2, self.kernel_size2, self.kernel_size2) 
         return
     
-    def do_training(self, loss, dl, opt = None, n_epochs = 10, lr_schedule = None, valid_dl = None,\
-                    preprocess = None, verbose = True):
+
+    def do_training(self, loss: torch.nn.Module, dl: DataLoader, opt: torch.optim.Optimizer=None, n_epochs: int=10, lr_schedule: torch.optim.lr_scheduler.StepLR=None,\
+                    valid_ds: Dataset=None, preprocess: Callable=None, verbose: bool=True):
         """
 
         Parameters
         ----------
-        loss : ``torch.nn`` loss function
+        loss : ``torch.nn.Module`` loss function
             Loss function for the model.
         dl : ``torch.utils.data.DataLoader``
             DataLoader with the training data.
@@ -149,8 +152,8 @@ class ConvLassoNet(nn.Module):
             Number of epochs for training. The default is 10.
         lr_schedule : from ``torch.optim.lr_scheduler``, optional
             Learning rate schedule. Step is taken after each epoch. The default is None.
-        valid_dl : ``torch.utils.data.DataLoader``, optional
-            DataLoader for validation loss. One sample is taken over the course of an epoch, then mean loss/accuracy is stored. The default is None.
+        valid_ds : ``torch.utils.data.Dataset``, optional
+            Dataset for validation loss. The default is None.
         preprocess : function, optional
             A function for preprocessing the inputs for the model. The default is None.
         verbose : boolean, optional
@@ -170,17 +173,12 @@ class ConvLassoNet(nn.Module):
         
         info = {'train_loss':[],'valid_loss':[],'train_acc':[],'valid_acc':[]}
         
-        if valid_dl is not None:
-            valid_iter = iter(valid_dl)
-            assert len(valid_iter) >= n_epochs, "Validation DataLoader needs to have more items than number of epochs."
-
+        
         for j in np.arange(n_epochs):
             
             ################### SETUP FOR EPOCH ##################
             all_loss = list(); all_acc = list()
             all_vl_loss = list(); all_vl_acc = list()
-            if valid_dl is not None:
-                v_inputs, v_targets = valid_iter.next()  
             
             ################### START OF EPOCH ###################
             self.train()
@@ -210,28 +208,29 @@ class ConvLassoNet(nn.Module):
                 all_loss.append(loss_val.item())
                 all_acc.append((predictions == targets).float().mean())
                 
-                ### VALIDATION
-                if valid_dl is not None:
-                    self.eval()
-                    output = self.forward(v_inputs)
-                    v_loss = loss(output, v_targets)
-                    v_scores, v_predictions = torch.max(output.data, 1)
-                    v_correct = (v_predictions == v_targets).float().mean()
-                    
-                    all_vl_loss.append(v_loss.item())
-                    all_vl_acc.append(v_correct.item())
-            
+                
             ################### END OF EPOCH ###################
             if lr_schedule is not None:
                 lr_schedule.step()    
+            
+            ### VALIDATION
+            # if valid_ds is not None:
+            #     self.eval()
+            #     output = self.forward(valid_ds.X)
+            #     v_loss = loss(output, v_targets)
+            #     v_scores, v_predictions = torch.max(output.data, 1)
+            #     v_correct = (v_predictions == v_targets).float().mean()
                 
+            #     all_vl_loss.append(v_loss.item())
+            #     all_vl_acc.append(v_correct.item())
+        
             ### STORE
             
             info['train_loss'].append(np.mean(all_loss))
             info['train_acc'].append(np.mean(all_acc))
-            if valid_dl is not None:
-                info['valid_loss'].append(np.mean(all_vl_loss))
-                info['valid_acc'].append(np.mean(all_vl_acc))
+            # if valid_ds is not None:
+            #     info['valid_loss'].append()
+            #     info['valid_acc'].append()
             
             if verbose:
                 print(f"Epoch {j+1}/{n_epochs}: \t  train loss: {np.mean(all_loss)}, \t train accuracy: {np.mean(all_acc)}.")

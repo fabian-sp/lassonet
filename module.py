@@ -1,7 +1,9 @@
 import numpy as np
 import torch
 from torch.nn import functional as F
+from torch.utils.data import Dataset, DataLoader
 
+from typing import Callable
  
 # The following code is copied (with small adaptations) from https://github.com/lasso-net/lassonet/blob/master/lassonet/prox.py
 # Copyright of Louis Abraham, Ismael Lemhadri
@@ -59,7 +61,7 @@ def hier_prox(v, u, lambda_, lambda_bar, M):
 #%% own implementation of LassoNet
 
 class LassoNet(torch.nn.Module):
-    def __init__(self, G, lambda_ = 0.01, M = 10, skip_bias = False):
+    def __init__(self, G: torch.nn.Module, lambda_: float=0.01, M: float=10, skip_bias: bool=False):
         """
         Implementation of LassoNet for arbitrary architecture. See https://jmlr.org/papers/volume22/20-848/20-848.pdf for details.
 
@@ -98,8 +100,8 @@ class LassoNet(torch.nn.Module):
         y2 = self.skip(x)
         return y1+y2
     
-    def do_training(self, loss, dl, opt = None, n_epochs = 10, lr_schedule = None, valid_dl = None,\
-                    preprocess = None, verbose = True):
+    def do_training(self, loss: torch.nn.Module, dl: DataLoader, opt: torch.optim.Optimizer=None, n_epochs: int=10, lr_schedule: torch.optim.lr_scheduler.StepLR=None,\
+                    valid_ds: Dataset=None, preprocess: Callable=None, verbose: bool=True):
         """
 
         Parameters
@@ -108,14 +110,14 @@ class LassoNet(torch.nn.Module):
             Loss function for the model.
         dl : ``torch.utils.data.DataLoader``
             DataLoader with the training data.
-        opt : from ``torch.optim``, optional
+        opt : from ``torch.optim.Optimizer``, optional
             Pytorch optimizer. The default is SGD with Nesterov momentum and learning rate 0.001.
         n_epochs : int, optional
             Number of epochs for training. The default is 10.
-        lr_schedule : from ``torch.optim.lr_scheduler``, optional
+        lr_schedule : from ``torch.optim.lr_scheduler.StepLR``, optional
             Learning rate schedule. Step is taken after each epoch. The default is None.
-        valid_dl : ``torch.utils.data.DataLoader``, optional
-            DataLoader for validation loss. One sample is taken over the course of an epoch, then mean loss/accuracy is stored. The default is None.
+        valid_dl : ``torch.utils.data.Dataset``, optional
+            Dataset for validation loss. The default is None.
         preprocess : function, optional
             A function for preprocessing the inputs for the model. The default is None.
         verbose : boolean, optional
@@ -135,18 +137,11 @@ class LassoNet(torch.nn.Module):
         
         info = {'train_loss':[],'valid_loss':[],'train_acc':[],'valid_acc':[]}
         
-        if valid_dl is not None:
-            valid_iter = iter(valid_dl)
-            assert len(valid_iter) >= n_epochs, "Validation DataLoader needs to have more items than number of epochs."
-
         for j in np.arange(n_epochs):
             
             ################### SETUP FOR EPOCH ##################
             all_loss = list(); all_acc = list()
             all_vl_loss = list(); all_vl_acc = list()
-            
-            if valid_dl is not None:
-                v_inputs, v_targets = valid_iter.next()  
             
             ################### START OF EPOCH ###################
             self.train()
@@ -171,36 +166,36 @@ class LassoNet(torch.nn.Module):
                                                                             lambda_=self.lambda_*alpha, lambda_bar=0, M = self.M)
                 
                 ## COMPUTE ACCURACY AND STORE 
-                #print(loss_val.item())
                 scores, predictions = torch.max(y_pred.data, 1)
                 all_loss.append(loss_val.item())
                 all_acc.append((predictions == targets).float().mean())
                 
-                ### VALIDATION
-                if valid_dl is not None:
-                    self.eval()
-                    output = self.forward(v_inputs)
-                    v_loss = loss(output, v_targets)
-                    v_scores, v_predictions = torch.max(output.data, 1)
-                    v_correct = (v_predictions == v_targets).float().mean()
-                    
-                    all_vl_loss.append(v_loss.item())
-                    all_vl_acc.append(v_correct.item())
             
             ################### END OF EPOCH ###################
             if lr_schedule is not None:
                 lr_schedule.step()    
                 
+            ### VALIDATION
+            if valid_ds is not None:
+                self.eval()
+                output = self.forward(valid_ds.X)
+                this_vl_loss = loss(output, valid_ds.Y).item()
+                v_scores, v_predictions = torch.max(output.data, 1)
+                this_vl_acc = (v_predictions == valid_ds.Y).float().mean().item()
+                
+                
             ### STORE
             
             info['train_loss'].append(np.mean(all_loss))
             info['train_acc'].append(np.mean(all_acc))
-            if valid_dl is not None:
-                info['valid_loss'].append(np.mean(all_vl_loss))
-                info['valid_acc'].append(np.mean(all_vl_acc))
+            if valid_ds is not None:
+                info['valid_loss'].append(this_vl_loss)
+                info['valid_acc'].append(this_vl_acc)
             
             if verbose:
-                print(f"Epoch {j+1}/{n_epochs}: \t  train loss: {np.mean(all_loss)}, \t train accuracy: {np.mean(all_acc)}.")
+                print(f"Epoch {j+1}/{n_epochs}: \t  train loss: {np.mean(all_loss)}.")
+                if valid_ds is not None:
+                    print(f"Epoch {j+1}/{n_epochs}: \t  validation loss: {this_vl_loss}.")    
                 print(opt)    
             
         return info

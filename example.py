@@ -47,7 +47,6 @@ ds = MyDataset(X,Y)
 dl = DataLoader(ds, batch_size = batch_size, shuffle = True)
 
 valid_ds = MyDataset(X_test,Y_test)
-valid_dl = DataLoader(valid_ds, batch_size = batch_size, shuffle = True)
 
 #%% Define non-linear part of LassoNet
 
@@ -98,7 +97,7 @@ alpha0 = 1e-3 #initial step size/learning rate
 opt = torch.optim.SGD(model.parameters(), lr = alpha0, momentum = 0.9, nesterov = True)
 sched = StepLR(opt, step_size = 20, gamma = 0.7)
 
-train_info = model.do_training(loss, dl, opt = opt, lr_schedule = sched, valid_dl = valid_dl, n_epochs = n_epochs, verbose = True)
+train_info = model.do_training(loss, dl, opt=opt, lr_schedule=sched, valid_ds=valid_ds, n_epochs=n_epochs, verbose=True)
 
 #%% Evaluation
 
