@@ -37,7 +37,7 @@ def conv_output_shape(h_w, kernel_size=1, stride=1, pad=0, dilation=1):
     return h, w
 
 class ConvLassoNet(nn.Module):
-    def __init__(self, lambda_ = 1., M = 1., D_in = (28,28), D_out = 10, out_channels1 = 16, out_channels2 = 32, stride=1, padding=2, dilation=1):
+    def __init__(self, lambda_=1., M=1., D_in = (28,28), D_out=10, out_channels1=16, out_channels2=32, stride=1, padding=2, dilation=1):
         """
         LassoNet applied after a first layer of convolutions. See https://jmlr.org/papers/volume22/20-848/20-848.pdf for details.
 
