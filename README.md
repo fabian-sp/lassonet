@@ -2,6 +2,8 @@
 
 The LassoNet has been implemented by their authors, however only for feed-forward neural networks with ReLU activation. Here, we try to implement the idea more generally.
 
+**NOTE:** This is currently only a prototype implementation.
+
 ## How to use
 
 Define a PyTorch network `G`  (i.e. some class inheriting from `torch.nn.Module`) with arbitrary architecture (i.e. a `forward`-method). `G` must fulfill
@@ -14,6 +16,11 @@ The `LassoNet` based on `G` is then initialized via
 	model = LassoNet(G, lambda_, M)
 
 where `lambda_` and `M` are as in the paper. 
+
+## File structure
+
+* The standard LassoNet as describe above (for a fixed `lambda`) can be found in `module.py`.
+* A preliminary version of a ConvolutionalLassoNet (i.e. applying the LassoNet penalty to the output of a conv. layer) is in `conv_lassonet.py`.
 
 ## Examples
 
