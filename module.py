@@ -100,10 +100,10 @@ class LassoNet(torch.nn.Module):
         y2 = self.skip(x)
         return y1+y2
     
-    def do_training(self, loss: torch.nn.Module, dl: DataLoader, opt: torch.optim.Optimizer=None, n_epochs: int=10, lr_schedule: torch.optim.lr_scheduler.StepLR=None,\
-                    valid_ds: Dataset=None, preprocess: Callable=None, verbose: bool=True):
+    def train_epoch(self, loss: torch.nn.Module, dl: DataLoader, opt: torch.optim.Optimizer=None, preprocess: Callable=None):
         """
-
+        Trains one epoch.
+        
         Parameters
         ----------
         loss : ``torch.nn`` loss function
@@ -112,91 +112,48 @@ class LassoNet(torch.nn.Module):
             DataLoader with the training data.
         opt : from ``torch.optim.Optimizer``, optional
             Pytorch optimizer. The default is SGD with Nesterov momentum and learning rate 0.001.
-        n_epochs : int, optional
-            Number of epochs for training. The default is 10.
-        lr_schedule : from ``torch.optim.lr_scheduler.StepLR``, optional
-            Learning rate schedule. Step is taken after each epoch. The default is None.
-        valid_dl : ``torch.utils.data.Dataset``, optional
-            Dataset for validation loss. The default is None.
         preprocess : function, optional
             A function for preprocessing the inputs for the model. The default is None.
-        verbose : boolean, optional
-            Verbosity. The default is True.
-
+        
         Returns
         -------
         info : dict
-            Training and validation loss and accuracy history. Each entry is the loss/accuracy averaged over one epoch.
+            Training loss and accuracy history. 
 
         """
         if opt is None:
-            opt = torch.optim.SGD(self.parameters(), lr = 0.001, momentum = 0.9, nesterov = True)
+            opt = torch.optim.SGD(self.parameters(), lr = 1e-3, momentum = 0.9, nesterov = True)
         
-        if verbose:
-            print(opt)    
-        
-        info = {'train_loss':[],'valid_loss':[],'train_acc':[],'valid_acc':[]}
-        
-        for j in np.arange(n_epochs):
+        info = {'train_loss':[],'train_acc':[]}
+                    
+        ################### START OF EPOCH ###################
+        self.train()
+        for inputs, targets in dl:
+            if preprocess is not None:
+                inputs = preprocess(inputs)
             
-            ################### SETUP FOR EPOCH ##################
-            all_loss = list(); all_acc = list()
-            all_vl_loss = list(); all_vl_acc = list()
+            # forward pass
+            y_pred = self.forward(inputs)
+            # compute loss
+            loss_val = loss(y_pred, targets)           
+            # zero gradients
+            opt.zero_grad()    
+            # backward pass
+            loss_val.backward()    
+            # iteration
+            opt.step()
+            # step size
+            alpha = opt.state_dict()['param_groups'][0]['lr']
+            # prox step
+            self.skip.weight.data, self.G.W1.weight.data = hier_prox(self.skip.weight.data, self.G.W1.weight.data,\
+                                                                        lambda_=self.lambda_*alpha, lambda_bar=0, M = self.M)
             
-            ################### START OF EPOCH ###################
-            self.train()
-            for inputs, targets in dl:
-                if preprocess is not None:
-                    inputs = preprocess(inputs)
-                
-                # forward pass
-                y_pred = self.forward(inputs)
-                # compute loss
-                loss_val = loss(y_pred, targets)           
-                # zero gradients
-                opt.zero_grad()    
-                # backward pass
-                loss_val.backward()    
-                # iteration
-                opt.step()
-                # step size
-                alpha = opt.state_dict()['param_groups'][0]['lr']
-                # prox step
-                self.skip.weight.data, self.G.W1.weight.data = hier_prox(self.skip.weight.data, self.G.W1.weight.data,\
-                                                                            lambda_=self.lambda_*alpha, lambda_bar=0, M = self.M)
-                
-                ## COMPUTE ACCURACY AND STORE 
-                scores, predictions = torch.max(y_pred.data, 1)
-                all_loss.append(loss_val.item())
-                all_acc.append((predictions == targets).float().mean())
-                
+            ## COMPUTE ACCURACY AND STORE 
+            _, predictions = torch.max(y_pred.data, 1)
+            accuracy = (predictions == targets).float().mean().item()
+            info['train_loss'].append(loss_val.item())
+            info['train_acc'].append(accuracy)
             
-            ################### END OF EPOCH ###################
-            if lr_schedule is not None:
-                lr_schedule.step()    
-                
-            ### VALIDATION
-            if valid_ds is not None:
-                self.eval()
-                output = self.forward(valid_ds.X)
-                this_vl_loss = loss(output, valid_ds.Y).item()
-                v_scores, v_predictions = torch.max(output.data, 1)
-                this_vl_acc = (v_predictions == valid_ds.Y).float().mean().item()
-                
-                
-            ### STORE
-            
-            info['train_loss'].append(np.mean(all_loss))
-            info['train_acc'].append(np.mean(all_acc))
-            if valid_ds is not None:
-                info['valid_loss'].append(this_vl_loss)
-                info['valid_acc'].append(this_vl_acc)
-            
-            if verbose:
-                print(f"Epoch {j+1}/{n_epochs}: \t  train loss: {np.mean(all_loss)}.")
-                if valid_ds is not None:
-                    print(f"Epoch {j+1}/{n_epochs}: \t  validation loss: {this_vl_loss}.")    
-                print(opt)    
-            
+                    
         return info
     

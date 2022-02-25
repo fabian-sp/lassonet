@@ -31,16 +31,16 @@ X_test, Y_test = generate_toy_example(4000)
 #%% Create DataLoader (see https://pytorch.org/tutorials/beginner/basics/data_tutorial.html)
 
 class MyDataset(Dataset):
-    def __init__(self, X, Y):
-        self.X = X
-        self.Y = Y
+    def __init__(self, data, targets):
+        self.data = data
+        self.targets = targets
 
     def __len__(self):
-        return len(self.Y)
+        return len(self.targets)
 
     def __getitem__(self, idx):
-        x = self.X[idx, :]
-        y = self.Y[idx]
+        x = self.data[idx, :]
+        y = self.targets[idx]
         return x, y
     
 ds = MyDataset(X,Y)
@@ -90,22 +90,43 @@ for param in model.parameters():
 
 #%% Training
 
-n_epochs = 100
+n_epochs = 80
 alpha0 = 1e-3 #initial step size/learning rate
 
 #opt = torch.optim.Adam(model.parameters(), lr = alpha0)
 opt = torch.optim.SGD(model.parameters(), lr = alpha0, momentum = 0.9, nesterov = True)
-sched = StepLR(opt, step_size = 20, gamma = 0.7)
+lr_schedule = StepLR(opt, step_size = 20, gamma = 0.7)
 
-train_info = model.do_training(loss, dl, opt=opt, lr_schedule=sched, valid_ds=valid_ds, n_epochs=n_epochs, verbose=True)
 
-#%% Evaluation
+loss_hist = {'train_loss':[], 'valid_loss':[]}
+for j in np.arange(n_epochs): 
+    print(f"================== Epoch {j+1}/{n_epochs} ================== ")
+    print(opt)  
+    
+    ### TRAINING
+    epoch_info = model.train_epoch(loss, dl, opt=opt)
+    loss_hist['train_loss'].append(np.mean(epoch_info['train_loss']))
+    
+    if lr_schedule is not None:
+        lr_schedule.step()
+    
+    ### VALIDATION
+    model.eval()
+    output = model.forward(valid_ds.data)          
+    valid_loss = loss(output, valid_ds.targets).item()
+    loss_hist['valid_loss'].append(valid_loss)
+    
+    print(f"\t  train loss: {np.mean(epoch_info['train_loss'])}.")
+    print(f"\t  validation loss: {valid_loss}.")    
+
+
+#%% Plotting
 
 print("Skip layer weights: ", model.skip.weight.data)
 
 fig, ax = plt.subplots()
-ax.plot(train_info['train_loss'], c = '#002635', marker = 'o', label = 'Training loss')
-ax.plot(train_info['valid_loss'], c = '#002635', marker = 'x', ls = '--', label = 'Validation loss')
+ax.plot(loss_hist['train_loss'], c = '#002635', marker = 'o', label = 'Training loss')
+ax.plot(loss_hist['valid_loss'], c = '#002635', marker = 'x', ls = '--', label = 'Validation loss')
 ax.set_yscale('log')
 ax.set_xlabel('Epoch')
 ax.set_ylabel('Loss')

@@ -37,7 +37,7 @@ def conv_output_shape(h_w, kernel_size=1, stride=1, pad=0, dilation=1):
     return h, w
 
 class ConvLassoNet(nn.Module):
-    def __init__(self, lambda_ = 1., M = 1., D_in = (28,28), D_out = 10, out_channels1 = 16, out_channels2 = 32, stride=1, padding=2, dilation=1):
+    def __init__(self, lambda_=1., M=1., D_in = (28,28), D_out=10, out_channels1=16, out_channels2=32, stride=1, padding=2, dilation=1):
         """
         LassoNet applied after a first layer of convolutions. See https://jmlr.org/papers/volume22/20-848/20-848.pdf for details.
 
@@ -136,9 +136,9 @@ class ConvLassoNet(nn.Module):
         return
     
 
-    def do_training(self, loss: torch.nn.Module, dl: DataLoader, opt: torch.optim.Optimizer=None, n_epochs: int=10, lr_schedule: torch.optim.lr_scheduler.StepLR=None,\
-                    valid_ds: Dataset=None, preprocess: Callable=None, verbose: bool=True):
+    def train_epoch(self, loss: torch.nn.Module, dl: DataLoader, opt: torch.optim.Optimizer=None):
         """
+        Trains one epoch.
 
         Parameters
         ----------
@@ -148,93 +148,44 @@ class ConvLassoNet(nn.Module):
             DataLoader with the training data.
         opt : from ``torch.optim``, optional
             Pytorch optimizer. The default is SGD with Nesterov momentum and learning rate 0.001.
-        n_epochs : int, optional
-            Number of epochs for training. The default is 10.
-        lr_schedule : from ``torch.optim.lr_scheduler``, optional
-            Learning rate schedule. Step is taken after each epoch. The default is None.
-        valid_ds : ``torch.utils.data.Dataset``, optional
-            Dataset for validation loss. The default is None.
-        preprocess : function, optional
-            A function for preprocessing the inputs for the model. The default is None.
-        verbose : boolean, optional
-            Verbosity. The default is True.
-
+        
         Returns
         -------
         info : dict
-            Training and validation loss and accuracy history. Each entry is the loss/accuracy averaged over one epoch.
+            Training loss and accuracy.
 
         """
         if opt is None:
-            opt = torch.optim.SGD(self.parameters(), lr = 0.001, momentum = 0.9, nesterov = True)
+            opt = torch.optim.SGD(self.parameters(), lr = 1e-3, momentum = 0.9, nesterov = True)
         
-        if verbose:
-            print(opt)    
+        info = {'train_loss':[],'train_acc':[]}
         
-        info = {'train_loss':[],'valid_loss':[],'train_acc':[],'valid_acc':[]}
-        
-        
-        for j in np.arange(n_epochs):
-            
-            ################### SETUP FOR EPOCH ##################
-            all_loss = list(); all_acc = list()
-            all_vl_loss = list(); all_vl_acc = list()
-            
-            ################### START OF EPOCH ###################
-            self.train()
-            for inputs, targets in dl:
-                if preprocess is not None:
-                    inputs = preprocess(inputs)
+        ################### START OF EPOCH ###################
+        self.train()
+        for inputs, targets in dl:
                 
-                # forward pass
-                y_pred = self.forward(inputs)
-                # compute loss
-                loss_val = loss(y_pred, targets)           
-                # zero gradients
-                opt.zero_grad()    
-                # backward pass
-                loss_val.backward()    
-                # iteration
-                opt.step()
-                # step size
-                alpha = opt.state_dict()['param_groups'][0]['lr']
-                # prox step
-                if self.lambda_ is not None:
-                    self.prox(alpha)
-                
-                ## COMPUTE ACCURACY AND STORE 
-                #print(loss_val.item())
-                scores, predictions = torch.max(y_pred.data, 1)
-                all_loss.append(loss_val.item())
-                all_acc.append((predictions == targets).float().mean())
-                
-                
-            ################### END OF EPOCH ###################
-            if lr_schedule is not None:
-                lr_schedule.step()    
+            # forward pass
+            y_pred = self.forward(inputs)
+            # compute loss
+            loss_val = loss(y_pred, targets)           
+            # zero gradients
+            opt.zero_grad()    
+            # backward pass
+            loss_val.backward()    
+            # iteration
+            opt.step()
+            # step size
+            alpha = opt.state_dict()['param_groups'][0]['lr']
+            # prox step
+            if self.lambda_ is not None:
+                self.prox(alpha)
             
-            ### VALIDATION
-            # if valid_ds is not None:
-            #     self.eval()
-            #     output = self.forward(valid_ds.X)
-            #     v_loss = loss(output, v_targets)
-            #     v_scores, v_predictions = torch.max(output.data, 1)
-            #     v_correct = (v_predictions == v_targets).float().mean()
-                
-            #     all_vl_loss.append(v_loss.item())
-            #     all_vl_acc.append(v_correct.item())
-        
-            ### STORE
             
-            info['train_loss'].append(np.mean(all_loss))
-            info['train_acc'].append(np.mean(all_acc))
-            # if valid_ds is not None:
-            #     info['valid_loss'].append()
-            #     info['valid_acc'].append()
-            
-            if verbose:
-                print(f"Epoch {j+1}/{n_epochs}: \t  train loss: {np.mean(all_loss)}, \t train accuracy: {np.mean(all_acc)}.")
-                print(opt)    
+            ## COMPUTE ACCURACY AND STORE 
+            _, predictions = torch.max(y_pred.data, 1)
+            accuracy = (predictions == targets).float().mean().item()
+            info['train_loss'].append(loss_val.item())
+            info['train_acc'].append(accuracy)
             
         return info
         
