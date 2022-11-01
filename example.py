@@ -1,3 +1,7 @@
+"""
+LassoNet for a simple toy example.
+"""
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -44,27 +48,7 @@ Define a simple Feed forward RelU network.
 It is important, that we the first layer has attribute name ``W1``.
 """
 
-class FeedForward(torch.nn.Module):
-    def __init__(self, D_in, D_out, H=64):
-        super().__init__()
-        self.D_in = D_in
-        self.D_out = D_out
-        
-        self.W1 = torch.nn.Linear(D_in, H, bias =True)
-        self.relu = torch.nn.ReLU()
-        self.W2 = torch.nn.Linear(H, H)
-        self.W3 = torch.nn.Linear(H, D_out)
-        return
-    
-    def forward(self, x):
-        x = self.W1(x)
-        x = self.relu(x)
-        x = self.W2(x)
-        x = self.relu(x)
-        x = self.W3(x)
-        return x
-    
-#%% Initialize the model
+from models.utils import FeedForward
 
 l1 = 6.
 M = 1.
