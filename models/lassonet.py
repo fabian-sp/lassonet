@@ -8,6 +8,7 @@ import torch
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 
+import tqdm
 import warnings
  
 #%% The code of this section is copied (with small adaptations) from https://github.com/lasso-net/lassonet/blob/master/lassonet/prox.py
@@ -155,8 +156,9 @@ class LassoNet(torch.nn.Module):
         state = {'train_loss': list(), }
                     
         self.train()
-        for inputs, targets in dl:
-            
+        pbar = tqdm.tqdm(dl)
+        for batch in pbar:
+            inputs, targets = batch
             opt.zero_grad() # zero gradients    
             y_pred = self.forward(inputs) # forward pass
             loss_val = loss(y_pred, targets) # compute loss           
@@ -170,6 +172,6 @@ class LassoNet(torch.nn.Module):
                                                                      M = self.M) # prox step
             
             state['train_loss'].append(loss_val.item())
-                  
+            pbar.set_description(f'Training - {loss_val.item():.3f}')
         return state
     

@@ -71,7 +71,6 @@ lr_schedule = StepLR(opt, step_size=20, gamma=0.5) # learning rate scheduler
 
 info = list()
 
-print("Epoch | \t train loss \t | test loss")
 for j in np.arange(n_epochs): 
     
     # training
@@ -85,7 +84,7 @@ for j in np.arange(n_epochs):
     
     info.append({'train_loss': train_loss, 'test_loss': test_loss})
     
-    print(f"{j+1} \t \t  {np.round(train_loss,4)}  \t \t {np.round(test_loss,4)}.")
+    print(f"epoch {j+1}: \t \t train loss={np.round(train_loss,4)},  \t \t test_loss={np.round(test_loss,4)}.")
     
 #%% Plotting
 

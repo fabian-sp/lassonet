@@ -16,9 +16,11 @@ from .models import hier_prox
 
 
 class ConvLassoNet(nn.Module):
-    def __init__(self, lambda_=1., M=1., D_in = (28,28), D_out=10, out_channels1=16, out_channels2=32, stride=1, padding=2, dilation=1):
+    def __init__(self, lambda_=1., M=1., D_in = (28,28), D_out=10):
         """
-        LassoNet applied after a first layer of convolutions. See https://jmlr.org/papers/volume22/20-848/20-848.pdf for details.
+        Note that this is experimental!
+        
+        This model is LassoNet applied to the output of the first convolutional layer.
 
         Parameters
         ----------
@@ -28,7 +30,7 @@ class ConvLassoNet(nn.Module):
         M : float, optional
             Penalty parameter for the hierarchical constraint. The default is 1.
         D_in : int, optional
-            input dimension of the model. The default is 784.
+            input dimension of the model. The default is (28,28) for MNIST images.
         D_out : int, optional
             output dimension of the model. The default is 10.
 
@@ -47,6 +49,13 @@ class ConvLassoNet(nn.Module):
         assert (self.lambda_ is None) or (self.lambda_ > 0), "lambda_ must be None or positive"
         assert self.M > 0, "M needs to be positive (possibly np.inf)"
         
+        # convolutional parameters
+        out_channels1 = 16
+        out_channels2 = 32
+        stride = 1
+        padding = 2
+        dilation = 1
+        
         # hyperparameters (works as long as input size can be divided by 4)
         self.kernel_size1 = 5
         self.kernel_size2 = 5
@@ -55,12 +64,15 @@ class ConvLassoNet(nn.Module):
         
         self.D_in = D_in
         self.D_out = D_out
-        self.conv1_output_dim(stride, padding, dilation)
         
-        # first conv layer and skip layer
+        # width and height of conv1 output
+        self.h_out, self.w_out = conv_output_shape(self.D_in, self.kernel_size1, stride, padding, dilation)
+        
+        # first conv layer
         # input pixels nxn, filter size fxf, padding p: output size (n + 2p — f + 1)
         self.conv1 = nn.Conv2d(1, self.out_channels1, kernel_size=self.kernel_size1, stride=stride, padding=padding, dilation=dilation)
         
+        # skip layer
         if self.lambda_ is not None:
             self.skip = nn.Linear(self.out_channels1*self.h_out*self.w_out, self.D_out)
         
@@ -75,13 +87,7 @@ class ConvLassoNet(nn.Module):
         self.fc2 = nn.Linear(200, self.D_out)
         
         return
-    
-    def conv1_output_dim(self, stride, padding, dilation):
-        """ computes output dimension of conv1; needed for dimensionality of skip layer
-        """
-        self.h_out, self.w_out = conv_output_shape(self.D_in, self.kernel_size1, stride, padding, dilation)
-        
-        return
+
         
     def forward(self, x):
         out = self.conv1(x)
