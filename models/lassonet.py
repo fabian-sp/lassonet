@@ -127,7 +127,7 @@ class LassoNet(torch.nn.Module):
         y2 = self.skip(x)
         return y1+y2
     
-    def train_epoch(self, loss: torch.nn.Module, dl: DataLoader, opt: torch.optim.Optimizer=None):
+    def train_epoch(self, loss: torch.nn.Module, dl: DataLoader, opt: torch.optim.Optimizer=None) -> dict:
         """
         Trains one epoch.
 

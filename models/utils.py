@@ -1,4 +1,5 @@
 import torch
+import tqdm
 
 class FeedForward(torch.nn.Module):
     """
@@ -30,10 +31,13 @@ def eval_on_dataloader(model, loss, dl):
     model.eval()
     
     L = 0
+    pbar = tqdm.tqdm(dl)
     
-    for inputs, targets in dl:            
-        y_pred = model.forward(inputs) # forward pass
-        L += loss(y_pred, targets) # compute loss  
+    with torch.no_grad():
+        for batch in pbar: 
+            inputs, targets = batch           
+            y_pred = model.forward(inputs) # forward pass
+            L += loss(y_pred, targets).item() * inputs.shape[0] # compute loss*batch_size  
         
-    return L.item()/len(dl)
+    return L/len(dl.dataset)
     

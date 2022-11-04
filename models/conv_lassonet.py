@@ -9,14 +9,15 @@ Some code snippers are taken from:
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
-from typing import Callable
+from torch.utils.data import  DataLoader
 
-from .models import hier_prox
+import tqdm
+import warnings
+from .lassonet import hier_prox
 
 
 class ConvLassoNet(nn.Module):
-    def __init__(self, lambda_=1., M=1., D_in = (28,28), D_out=10):
+    def __init__(self, lambda_=1., M=1., D_in = (28,28), D_out=10):       
         """
         Note that this is experimental!
         
@@ -29,14 +30,11 @@ class ConvLassoNet(nn.Module):
             By setting to ``None``, the LassoNet penalty is deactivated.
         M : float, optional
             Penalty parameter for the hierarchical constraint. The default is 1.
-        D_in : int, optional
+        D_in : tuple, optional
             input dimension of the model. The default is (28,28) for MNIST images.
         D_out : int, optional
             output dimension of the model. The default is 10.
 
-        Returns
-        -------
-        None.
 
         """
         
@@ -122,32 +120,39 @@ class ConvLassoNet(nn.Module):
         return
     
 
-    def train_epoch(self, loss: torch.nn.Module, dl: DataLoader, opt: torch.optim.Optimizer=None):
+    def train_epoch(self, loss: torch.nn.Module, dl: DataLoader, opt: torch.optim.Optimizer=None) -> dict:
         """
         Trains one epoch.
 
         Parameters
         ----------
-        loss : ``torch.nn.Module`` loss function
+        loss : torch.nn.Module
             Loss function for the model.
-        dl : ``torch.utils.data.DataLoader``
+        dl : DataLoader
             DataLoader with the training data.
-        opt : from ``torch.optim``, optional
-            Pytorch optimizer. The default is SGD with Nesterov momentum and learning rate 0.001.
-        
+        opt : torch.optim.Optimizer, optional
+            Pytorch optimizer. The default is SGD with Nesterov momentum and learning rate 0.001.. The default is None.
+
         Returns
         -------
-        info : dict
-            Training loss and accuracy.
+        state : dict
+            DESCRIPTION.
 
         """
-        if opt is None:
-            opt = torch.optim.SGD(self.parameters(), lr = 1e-3, momentum = 0.9, nesterov = True)
         
-        info = {'train_loss':[],'train_acc':[]}
+        if opt is None:
+            opt = torch.optim.SGD(self.parameters(), lr=1e-3, momentum=0.9, nesterov=True)
+        else:
+            if len(opt.param_groups) > 1:
+                warnings.warn("The optimizer object has more than one param_group. For the proximal operator, we use the learning rate of opt.param_groups[0].")
+            self.opt = opt
+            
+        state = {'train_loss': list(), }
         
         self.train()
-        for inputs, targets in dl:
+        pbar = tqdm.tqdm(dl)
+        for batch in pbar:
+            inputs, targets = batch
             opt.zero_grad() # zero gradients    
                         
             y_pred = self.forward(inputs) # forward pass
@@ -160,13 +165,10 @@ class ConvLassoNet(nn.Module):
                 self.prox(alpha)
             
             
-            ## COMPUTE ACCURACY AND STORE 
-            _, predictions = torch.max(y_pred.data, 1)
-            accuracy = (predictions == targets).float().mean().item()
-            info['train_loss'].append(loss_val.item())
-            info['train_acc'].append(accuracy)
+            state['train_loss'].append(loss_val.item())
+            pbar.set_description(f'Training - {loss_val.item():.3f}')
             
-        return info
+        return state
         
 
 def conv_output_shape(h_w, kernel_size=1, stride=1, pad=0, dilation=1):
