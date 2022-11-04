@@ -22,9 +22,9 @@ where `lambda_` and `M` are penalty parameters as described in the paper.
 
 ## Examples
 
-* See `example.py` for a simple example on how to define `G` and how to train LassoNet.
-* See `example_mnist.py` for an example using the MNIST datatset.
-* See `example_conv_mnist.py` for an **experimental** model applying the LassoNet penalty to convolutional layers.
+* See [`example.py`](example.py) for a simple example on how to define `G` and how to train LassoNet.
+* See [`example_mnist.py`](example_mnist.py) for an example using the MNIST datatset.
+* See [`example_conv_mnist.py`](example_conv_mnist.py) for an **experimental (!)** model applying the LassoNet penalty to convolutional layers.
 
 
 ## References:
