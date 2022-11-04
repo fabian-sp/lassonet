@@ -1,136 +1,104 @@
 """
-
+LassoNet example for the MNIST dataset.
 """
+
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import torch
 from torch.optim.lr_scheduler import StepLR
-
-from module import LassoNet
-
 from torchvision import datasets
 import torchvision.transforms as transforms
 
-#%%
-batch_size = 50
+from models import LassoNet
+from models.utils import eval_on_dataloader
 
-# convert data to torch.FloatTensor
-transform = transforms.ToTensor()
+#%% prepare Dataset and DataLoader
+
+batch_size = 128
+
+# convert data to torch.FloatTensor, Normalize, and reshape to (784,)
+transform = transforms.Compose([transforms.ToTensor(),
+                                transforms.Normalize((0.1307,), (0.3081,)),
+                                transforms.Lambda(lambda x: x.view(-1).view(784))
+                              ])
+                               
 
 # choose the training and test datasets
-train_data = datasets.MNIST(root='data', train=True,
-                                   download=True, transform=transform)
-test_data = datasets.MNIST(root='data', train=False,
-                                  download=True, transform=transform)
+train_set = datasets.MNIST(root='data', train=True,
+                            download=True, transform=transform)
+test_set = datasets.MNIST(root='data', train=False,
+                           download=True, transform=transform)
 
 # prepare data loaders
-train_loader = torch.utils.data.DataLoader(train_data, batch_size = batch_size, num_workers=0)
-test_loader = torch.utils.data.DataLoader(test_data, batch_size = batch_size, num_workers=0)
+train_dl = torch.utils.data.DataLoader(train_set, batch_size=batch_size, 
+                                       drop_last=True, shuffle=True)
 
+test_dl = torch.utils.data.DataLoader(test_set, batch_size=batch_size, 
+                                      drop_last=True, shuffle=True)
 
 # obtain one batch of training images
-dataiter = iter(train_loader)
+dataiter = iter(train_dl)
 images, labels = dataiter.next()
 
-#%%
-
-class FeedForward(torch.nn.Module):
-    """
-    2-layer NN with RelU
-    """
-    def __init__(self, D_in = 784, D_out = 10, H = 512):
-        super().__init__()
-        self.D_in = D_in
-        self.D_out = D_out
-        
-        self.W1 = torch.nn.Linear(D_in, H, bias = True)
-        self.relu = torch.nn.ReLU()
-        self.W2 = torch.nn.Linear(H, H)
-        self.W3 = torch.nn.Linear(H, D_out)
-        return
     
-    def forward(self, x):
-        x = self.W1(x)
-        x = self.relu(x)
-        x = self.W2(x)
-        x = self.relu(x)
-        x = self.W3(x)
-        return x
-    
-#%% the actual model
+#%% Define LassoNet model with 2layer-FeedForward
 
-l1 = 5.
-M = 1.
+from models.utils import FeedForward
 
-G = FeedForward()
+l1 = 0.1
+M = 10.
+
+G = FeedForward(D_in=784, D_out=10, H=512)
 model = LassoNet(G, lambda_ = l1, M = M)
 
-loss = torch.nn.CrossEntropyLoss()
+loss = torch.nn.CrossEntropyLoss() # loss function for multiclass classification
 
 # test forward method, reshape input to vector with view
 G(images.view(-1,28*28))
 model.forward(images.view(-1,28*28))
 
-# params of G are already included in params of model!
-for param in model.parameters():
-    print(param.size())
-    
+print(model)
 
 #%% Training
 
-n_epochs = 5
-alpha0 = 1e-2 #initial step size/learning rate
+n_epochs = 10
+lr = 1e-2 # initial learning rate
 
-prep = lambda x: x.reshape(-1,28*28)
+opt = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9, nesterov=True) # optimizer object
+lr_schedule = StepLR(opt, step_size=10, gamma=0.5) # learning rate scheduler
 
-#opt = torch.optim.Adam(model.parameters(), lr = alpha0)
-opt = torch.optim.SGD(model.parameters(), lr = alpha0, momentum = 0.9, nesterov = True)
-lr_schedule = StepLR(opt, step_size = 1, gamma = 0.5)
+info = list()
 
-
-loss_hist = {'train_loss':[], 'valid_loss':[], 'train_acc':[], 'valid_acc':[]}
-
-for j in range(n_epochs): 
-    print(f"================== Epoch {j+1}/{n_epochs} ================== ")
-    print(opt)  
+for j in np.arange(n_epochs): 
     
-    ### TRAINING
-    epoch_info = model.train_epoch(loss, train_loader, opt=opt, preprocess=prep)
-    loss_hist['train_loss'].append(np.mean(epoch_info['train_loss']))
-    loss_hist['train_acc'].append(np.mean(epoch_info['train_acc']))
+    # training
+    epoch_info = model.train_epoch(loss, train_dl, opt)
+    lr_schedule.step()
     
-    if lr_schedule is not None:
-        lr_schedule.step()
-    
-    ### VALIDATION
-    valid_loss = 0; valid_acc = 0;
+    # validation
     model.eval()
-    for inputs, targets in test_loader:
-        output = model.forward(prep(inputs))          
-        valid_loss += loss(output, targets).item()
-        _, predictions = torch.max(output.data, 1)
-        valid_acc += (predictions == targets).float().mean().item()
+    train_loss = eval_on_dataloader(model, loss, train_dl)
+    test_loss = eval_on_dataloader(model, loss, test_dl)
     
-    loss_hist['valid_loss'].append(valid_loss/len(test_loader))
-    loss_hist['valid_acc'].append(valid_acc/len(test_loader))
-             
-    print(f"\t  train loss: {np.mean(epoch_info['train_loss'])}.")
-    print(f"\t  validation loss: {valid_loss/len(test_loader)}.")    
+    info.append({'train_loss': train_loss, 'test_loss': test_loss})
+    
+    print(f"epoch {j+1}: \t \t train loss={np.round(train_loss,4)},  \t \t test_loss={np.round(test_loss,4)}.")
+ 
+     
 
-#%% evaluation
+#%% Plotting
+
+info = pd.DataFrame(info)
 
 fig, ax = plt.subplots()
-ax.plot(loss_hist['train_loss'], c = '#002635', marker = 'o', label = 'Training loss')
-ax.plot(loss_hist['valid_loss'], c = '#002635', marker = 'x', ls = '--', label = 'Validation loss')
+ax.plot(info.train_loss, c='#002635', marker='o', label='Train loss')
+ax.plot(info.test_loss, c='#002635', marker='o', ls='--', alpha=0.6, label='Test loss')
 ax.set_yscale('log')
 ax.set_xlabel('Epoch')
-ax.set_ylabel('Loss')
+ax.legend()
 
-plt.figure()
-plt.imshow(G.W1.weight.data, cmap = "coolwarm")
-
-
-importance = model.skip.weight.data[8,:].view(28,28).numpy()
-plt.figure()
-plt.imshow(importance, cmap = "coolwarm")#, vmin = -0.0001, vmax = 0.0001)
+fig, ax = plt.subplots()
+ax.imshow(G.W1.weight.data, cmap="coolwarm", vmin=-.05, vmax=.05)
+fig.suptitle("First layer weight heatmap after training")
 
